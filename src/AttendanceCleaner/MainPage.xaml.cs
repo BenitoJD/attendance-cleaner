@@ -98,10 +98,20 @@ public partial class MainPage : ContentPage
             var scope = result.dates.Count > 1
                 ? $"{result.dates.Count} days ({result.dates[0]:dd-MM-yyyy} to {result.dates[^1]:dd-MM-yyyy})"
                 : $"{result.dates[0]:dd-MM-yyyy}";
-            StatusLabel.Text = $"Done: {result.report.Records.Count} rows for {scope}.";
 
             var rows = TemplateWriter.BuildRows(result.report.Records);
-            await Navigation.PushAsync(new ResultPage(rows, scope, Path.GetFileName(result.outputPath)));
+            var present = rows.Count(r => r.Remark == TemplateSpec.RemarkPresent);
+            var absent = rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent);
+            var inOnly = rows.Count(r => r.Remark == TemplateSpec.RemarkInPunchOnly);
+
+            SummaryLabel.Text = $"{rows.Count} rows · {present} present · {absent} absent"
+                + (inOnly > 0 ? $" · {inOnly} in-punch-only" : "");
+            SavedLabel.Text = $"{scope} · Saved as: {Path.GetFileName(result.outputPath)}";
+            BindingContext = new { Rows = rows };
+
+            ConvertSection.IsVisible = false;
+            ResultsSection.IsVisible = true;
+            _selectedFile = null;
         }
         catch (Exception ex)
         {
@@ -114,5 +124,14 @@ public partial class MainPage : ContentPage
             ConvertBtn.IsEnabled = _selectedFile != null;
             PickFileBtn.IsEnabled = true;
         }
+    }
+
+    private void OnConvertAnotherClicked(object? sender, EventArgs e)
+    {
+        ResultsSection.IsVisible = false;
+        ConvertSection.IsVisible = true;
+        FileNameLabel.Text = "";
+        StatusLabel.Text = "";
+        ConvertBtn.IsEnabled = false;
     }
 }
