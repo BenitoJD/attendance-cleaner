@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using AttendanceCleaner.Core;
 
 namespace AttendanceCleaner;
@@ -55,11 +55,12 @@ public partial class MainPage : ContentPage
         PickFileBtn.IsEnabled = false;
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
-        StatusLabel.Text = "Converting...";
+        StatusLabel.Text = "Reading the report...";
 
         try
         {
-            var result = await Task.Run(async () =>
+            // 1. read and parse the report, work out the output file name
+            var parsed = await Task.Run(async () =>
             {
                 string html;
                 using (var stream = await _selectedFile.OpenReadAsync())
@@ -86,27 +87,33 @@ public partial class MainPage : ContentPage
                     dates.Count > 1 ? TemplateSpec.MonthlyFileName : TemplateSpec.DailyFileName,
                     dates[0]);
 
-                var directory = Path.GetDirectoryName(_selectedFile.FullPath);
-                if (string.IsNullOrEmpty(directory)) directory = FileSystem.AppDataDirectory;
-                var outputPath = Path.Combine(directory, fileName);
-
-                TemplateWriter.WriteToFile(report.Records, outputPath);
-
-                return (report, dates, outputPath);
+                return (report, dates, fileName);
             });
 
-            var scope = result.dates.Count > 1
-                ? $"{result.dates.Count} days ({result.dates[0]:dd-MM-yyyy} to {result.dates[^1]:dd-MM-yyyy})"
-                : $"{result.dates[0]:dd-MM-yyyy}";
+            // 2. let the user choose where to save it
+            StatusLabel.Text = "Choose where to save the clean Excel...";
+            var outputPath = await AskForSaveLocationAsync(parsed.fileName)
+                ?? Path.Combine(GetFallbackDirectory(), parsed.fileName);
 
-            var rows = TemplateWriter.BuildRows(result.report.Records);
+            // 3. generate the workbook and write it
+            StatusLabel.Text = "Converting...";
+            var rows = await Task.Run(() =>
+            {
+                var built = TemplateWriter.BuildRows(parsed.report.Records);
+                using var ms = new MemoryStream();
+                TemplateWriter.Write(parsed.report.Records, ms);
+                File.WriteAllBytes(outputPath, ms.ToArray());
+                return built;
+            });
+
             var present = rows.Count(r => r.Remark == TemplateSpec.RemarkPresent);
             var absent = rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent);
             var inOnly = rows.Count(r => r.Remark == TemplateSpec.RemarkInPunchOnly);
 
             SummaryLabel.Text = $"{rows.Count} rows · {present} present · {absent} absent"
                 + (inOnly > 0 ? $" · {inOnly} in-punch-only" : "");
-            SavedLabel.Text = $"{scope} · Saved as: {Path.GetFileName(result.outputPath)}";
+            SavedLabel.Text = $"{Path.GetFileName(outputPath)}";
+            StatusLabel.Text = $"Saved to: {outputPath}";
             BuildTable(rows);
 
             ConvertSection.IsVisible = false;
@@ -124,6 +131,33 @@ public partial class MainPage : ContentPage
             ConvertBtn.IsEnabled = _selectedFile != null;
             PickFileBtn.IsEnabled = true;
         }
+    }
+
+    /// <summary>Windows: native "Save as" dialog so the user picks their own location.
+    /// Elsewhere: null (the caller saves next to the input file).</summary>
+    private async Task<string?> AskForSaveLocationAsync(string fileName)
+    {
+#if WINDOWS
+        if (this.Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window nativeWindow)
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow));
+            picker.SuggestedFileName = Path.GetFileNameWithoutExtension(fileName);
+            picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
+            picker.DefaultFileExtension = ".xlsx";
+            picker.FileTypeChoices.Add("Excel workbook", new List<string> { ".xlsx" });
+
+            var file = await picker.PickSaveFileAsync();
+            return file?.Path;
+        }
+#endif
+        return null;
+    }
+
+    private string GetFallbackDirectory()
+    {
+        var directory = Path.GetDirectoryName(_selectedFile?.FullPath);
+        return string.IsNullOrEmpty(directory) ? FileSystem.AppDataDirectory : directory;
     }
 
     private void OnConvertAnotherClicked(object? sender, EventArgs e)

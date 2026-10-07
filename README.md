@@ -55,7 +55,11 @@ dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.x
 
 ## Windows executable
 
-The GitHub Actions workflow (`.github/workflows/windows-build.yml`) builds a self-contained win-x64 exe on every push to `main` (or manually via *Run workflow*). Download it from the run's **Artifacts** section on the [Actions page](https://github.com/BenitoJD/attendance-cleaner/actions) — it's a zip you can extract and run on any Windows 10/11 PC, no .NET install needed.
+The GitHub Actions workflow (`.github/workflows/windows-build.yml`) tests the core engine and builds a **self-contained win-x64 exe** on every push to `main` (or manually via *Run workflow*). Download `AttendanceCleaner-win-x64` from the run's **Artifacts** section on the [Actions page](https://github.com/BenitoJD/attendance-cleaner/actions), unzip it anywhere, and run `AttendanceCleaner.exe`.
+
+- **No dependencies**: the zip carries the .NET runtime and Windows App SDK — nothing to install on the machine.
+- **Compatibility**: any 64-bit Windows 10 (1809+) or Windows 11 PC. Windows-on-ARM machines run it through their built-in x64 emulation.
+- On first save the app opens a normal Windows **Save as** dialog, so each user picks their preferred folder; afterwards the choice is remembered per conversion.
 
 ## Layout
 
