@@ -320,6 +320,15 @@ public class TemplateWriterExcelTests : IDisposable
     }
 
     [Fact]
+    public void Headers_are_correctly_spelled()
+    {
+        // guards against typos sneaking back into the template
+        Assert.Equal(
+            new[] { "Sl.No", "ID No", "Name", "Gender", "Date", "Day", "In punch", "Out punch", "Total hours", "Remarks" },
+            TemplateSpec.Headers);
+    }
+
+    [Fact]
     public void Numeric_id_and_serial_number_are_written_as_numbers()
     {
         var ws = WriteAndOpenSheet();

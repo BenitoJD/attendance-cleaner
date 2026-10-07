@@ -172,25 +172,62 @@ public partial class MainPage : ContentPage
     private Grid? _headerRow;
 
     /// <summary>Renders the header from the template spec and feeds the rows to the
-    /// virtualised list — nothing about the column layout is written in UI code.</summary>
+    /// virtualised list. Column widths are computed from the actual content, so nothing
+    /// is truncated and no width is written in UI code.</summary>
     private void BuildTable(IReadOnlyList<TemplateRow> rows)
     {
-        var widths = TemplateSpec.PreviewColumnWidths;
+        var widths = ComputeColumnWidths(rows);
         TableGrid.WidthRequest = widths.Sum() + 2;
 
         if (_headerRow is null)
         {
-            _headerRow = BuildTableRow(TemplateSpec.Headers, header: true);
+            _headerRow = BuildTableRow(TemplateSpec.Headers, widths, header: true);
             Grid.SetRow(_headerRow, 0);
             TableGrid.Add(_headerRow);
         }
 
+        ItemsView.ItemTemplate = new DataTemplate(() =>
+        {
+            var grid = new Grid();
+            for (var c = 0; c < widths.Length; c++)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition(widths[c]));
+                var left = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0;
+                var label = new Label
+                {
+                    FontSize = 12,
+                    Padding = new Thickness(4, 7),
+                    HorizontalTextAlignment = left ? TextAlignment.Start : TextAlignment.Center,
+                    LineBreakMode = LineBreakMode.NoWrap,
+                };
+                label.SetBinding(Label.TextProperty, $"{nameof(TemplateRow.Cells)}[{c}]");
+                Grid.SetColumn(label, c);
+                grid.Add(label);
+            }
+            return new ViewCell { View = grid };
+        });
         ItemsView.ItemsSource = rows;
     }
 
-    private static Grid BuildTableRow(IReadOnlyList<string> cells, bool header)
+    private static double[] ComputeColumnWidths(IReadOnlyList<TemplateRow> rows)
     {
-        var widths = TemplateSpec.PreviewColumnWidths;
+        var widths = new double[TemplateSpec.Headers.Length];
+        for (var c = 0; c < widths.Length; c++)
+        {
+            var headerLength = TemplateSpec.Headers[c].Length;
+            var longest = rows.Count == 0
+                ? headerLength
+                : rows.Select(r => r.Cells[c].Length).Prepend(headerLength).Max();
+            widths[c] = Math.Clamp(
+                longest * TemplateSpec.PreviewCharWidth + TemplateSpec.PreviewColumnPadding,
+                TemplateSpec.PreviewMinColumnWidth,
+                TemplateSpec.PreviewMaxColumnWidth);
+        }
+        return widths;
+    }
+
+    private static Grid BuildTableRow(IReadOnlyList<string> cells, double[] widths, bool header)
+    {
         var grid = new Grid { BackgroundColor = header ? Colors.LightGray : Colors.White };
 
         for (var c = 0; c < widths.Length; c++)
@@ -205,7 +242,7 @@ public partial class MainPage : ContentPage
                 HorizontalTextAlignment = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0
                     ? TextAlignment.Start
                     : TextAlignment.Center,
-                LineBreakMode = LineBreakMode.TailTruncation,
+                LineBreakMode = LineBreakMode.NoWrap,
             };
             Grid.SetRow(label, 0);
             Grid.SetColumn(label, c);
