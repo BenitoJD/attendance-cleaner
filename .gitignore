@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# data files - attendance data is sensitive, keep it out of the repo
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
