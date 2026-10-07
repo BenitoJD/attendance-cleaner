@@ -2,95 +2,156 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AttendanceCleaner.MainPage"
+             BackgroundColor="#F2F5F7"
              Title="Attendance Cleaner">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid>
 
-        <!-- convert section (scrollable so portrait and landscape both fit) -->
-        <ScrollView x:Name="ConvertSection" Grid.Row="0">
+        <!-- ═══════════ convert screen: one centered card ═══════════ -->
+        <ScrollView x:Name="ConvertSection">
             <VerticalStackLayout
                 VerticalOptions="Center"
-                Padding="40"
-                Spacing="20">
+                HorizontalOptions="Center"
+                Padding="28"
+                Spacing="20"
+                MaximumWidthRequest="540">
 
-            <Label
-                Text="Attendance Cleaner"
-                FontSize="28"
-                FontAttributes="Bold"
-                HorizontalTextAlignment="Center" />
+                <Border
+                    StrokeThickness="0" BackgroundColor="#059669"
+                    StrokeShape="RoundRectangle 26"
+                    WidthRequest="72" HeightRequest="72"
+                    HorizontalOptions="Center">
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Opacity="0.2" Radius="16" />
+                    </Border.Shadow>
+                    <Label Text="✓" TextColor="White" FontSize="36" FontAttributes="Bold"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
 
-            <Label
-                Text="Choose the report downloaded from the attendance software. The clean Excel is saved next to it."
-                FontSize="15"
-                TextColor="Gray"
-                HorizontalTextAlignment="Center" />
+                <Label Text="Attendance Cleaner"
+                       FontSize="28" FontAttributes="Bold" TextColor="#111827"
+                       HorizontalTextAlignment="Center" />
 
-            <Button
-                x:Name="PickFileBtn"
-                Text="Choose Excel file"
-                Clicked="OnPickFileClicked"
-                HorizontalOptions="Fill" />
+                <Label Text="Convert the attendance software's report into a clean Excel template — right on this PC."
+                       FontSize="15" TextColor="#6B7280"
+                       HorizontalTextAlignment="Center" />
 
-            <Button
-                x:Name="ConvertBtn"
-                Text="Convert &amp; save"
-                IsEnabled="False"
-                Clicked="OnConvertClicked"
-                HorizontalOptions="Fill" />
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        StrokeShape="RoundRectangle 20" Padding="24"
+                        HorizontalOptions="Fill">
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Opacity="0.07" Radius="14" />
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="14">
 
-            <Label
-                x:Name="FileNameLabel"
-                Text=""
-                FontSize="13"
-                HorizontalTextAlignment="Center" />
+                        <Button x:Name="PickFileBtn"
+                                Text="Choose Excel file"
+                                BackgroundColor="#059669" TextColor="White"
+                                FontSize="16" FontAttributes="Bold"
+                                CornerRadius="14" HeightRequest="52"
+                                Clicked="OnPickFileClicked" />
 
-            <Label
-                x:Name="StatusLabel"
-                Text=""
-                FontSize="13"
-                HorizontalTextAlignment="Center" />
+                        <Button x:Name="ConvertBtn"
+                                Text="Convert &amp; save"
+                                BackgroundColor="#D1FAE5" TextColor="#065F46"
+                                FontSize="16" FontAttributes="Bold"
+                                CornerRadius="14" HeightRequest="52"
+                                IsEnabled="False"
+                                Clicked="OnConvertClicked" />
+
+                        <Label x:Name="FileNameLabel" Text=""
+                               FontSize="13" FontAttributes="Bold" TextColor="#374151"
+                               HorizontalTextAlignment="Center" />
+
+                        <Label x:Name="StatusLabel" Text=""
+                               FontSize="13" TextColor="#6B7280"
+                               HorizontalTextAlignment="Center" MaxLines="4" LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- results section: the converted rows, shown like the Excel sheet -->
-        <Grid
-            x:Name="ResultsSection"
-            Grid.Row="1"
-            IsVisible="False"
-            RowDefinitions="Auto,Auto,Auto,*"
-            Padding="16"
-            RowSpacing="4">
+        <!-- ═══════════ results screen: stat cards + table card ═══════════ -->
+        <Grid x:Name="ResultsSection"
+              IsVisible="False"
+              RowDefinitions="Auto,Auto,*"
+              Padding="20"
+              RowSpacing="12">
 
-            <Label x:Name="SummaryLabel" FontAttributes="Bold" FontSize="16" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                    <Label Text="Converted attendance" FontSize="22" FontAttributes="Bold" TextColor="#111827" />
+                    <Label x:Name="SavedLabel" FontSize="12" TextColor="#6B7280" MaxLines="2" LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+                <Button Grid.Column="1"
+                        Text="Convert another file"
+                        BackgroundColor="White" TextColor="#059669"
+                        BorderColor="#059669" BorderWidth="1"
+                        FontSize="13" FontAttributes="Bold"
+                        CornerRadius="12" Padding="16,10"
+                        VerticalOptions="Center"
+                        Clicked="OnConvertAnotherClicked" />
+            </Grid>
 
-            <Label x:Name="SavedLabel" Grid.Row="1" FontSize="12" TextColor="#6B7280" />
+            <HorizontalStackLayout Grid.Row="1" Spacing="10">
 
-            <Button
-                Grid.Row="2"
-                Text="Convert another file"
-                FontSize="12"
-                Padding="14,6"
-                HorizontalOptions="Start"
-                Clicked="OnConvertAnotherClicked" />
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        StrokeShape="RoundRectangle 16" Padding="16,10" >
+                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                    <VerticalStackLayout Spacing="0">
+                        <Label x:Name="StatTotal" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
+                        <Label Text="rows" FontSize="11" TextColor="#6B7280" />
+                    </VerticalStackLayout>
+                </Border>
 
-            <ScrollView Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
-                <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        StrokeShape="RoundRectangle 16" Padding="16,10">
+                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                    <VerticalStackLayout Spacing="0">
+                        <Label x:Name="StatPresent" FontSize="20" FontAttributes="Bold" TextColor="#059669" />
+                        <Label Text="present" FontSize="11" TextColor="#6B7280" />
+                    </VerticalStackLayout>
+                </Border>
 
-                    <!-- virtualised list: only the visible rows are laid out, so rotation stays smooth.
-                         Header row and row cells are generated from TemplateSpec in code-behind,
-                         with column widths computed from the content. -->
-                    <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="32" CachingStrategy="RecycleElement" SeparatorVisibility="None" />
-                </Grid>
-            </ScrollView>
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        StrokeShape="RoundRectangle 16" Padding="16,10">
+                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                    <VerticalStackLayout Spacing="0">
+                        <Label x:Name="StatAbsent" FontSize="20" FontAttributes="Bold" TextColor="#DC2626" />
+                        <Label Text="absent" FontSize="11" TextColor="#6B7280" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        StrokeShape="RoundRectangle 16" Padding="16,10" IsVisible="False" x:Name="InOnlyCard">
+                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                    <VerticalStackLayout Spacing="0">
+                        <Label x:Name="StatInOnly" FontSize="20" FontAttributes="Bold" TextColor="#D97706" />
+                        <Label Text="in punch only" FontSize="11" TextColor="#6B7280" />
+                    </VerticalStackLayout>
+                </Border>
+            </HorizontalStackLayout>
+
+            <Border Grid.Row="2" Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                    StrokeShape="RoundRectangle 16" Padding="0"
+                    HorizontalOptions="Fill" VerticalOptions="Fill">
+                <Border.Shadow>
+                    <Shadow Brush="Black" Opacity="0.07" Radius="14" />
+                </Border.Shadow>
+                <!-- header + rows scroll horizontally together -->
+                <ScrollView Orientation="Horizontal">
+                    <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
+                        <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
+                                  CachingStrategy="RecycleElement" SeparatorVisibility="None" />
+                    </Grid>
+                </ScrollView>
+            </Border>
         </Grid>
 
-        <ActivityIndicator
-            x:Name="Spinner"
-            IsRunning="False"
-            IsVisible="False"
-            VerticalOptions="Center"
-            HorizontalOptions="Center"
-            Grid.RowSpan="2" />
+        <ActivityIndicator x:Name="Spinner"
+                           IsRunning="False" IsVisible="False"
+                           Color="#059669"
+                           VerticalOptions="Center" HorizontalOptions="Center" />
     </Grid>
 
 </ContentPage>

@@ -110,10 +110,12 @@ public partial class MainPage : ContentPage
             var absent = rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent);
             var inOnly = rows.Count(r => r.Remark == TemplateSpec.RemarkInPunchOnly);
 
-            SummaryLabel.Text = $"{rows.Count} rows · {present} present · {absent} absent"
-                + (inOnly > 0 ? $" · {inOnly} in-punch-only" : "");
-            SavedLabel.Text = $"{Path.GetFileName(outputPath)}";
-            StatusLabel.Text = $"Saved to: {outputPath}";
+            StatTotal.Text = $"{rows.Count}";
+            StatPresent.Text = $"{present}";
+            StatAbsent.Text = $"{absent}";
+            StatInOnly.Text = $"{inOnly}";
+            InOnlyCard.IsVisible = inOnly > 0;
+            SavedLabel.Text = $"Saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
             BuildTable(rows);
 
             ConvertSection.IsVisible = false;
@@ -171,6 +173,12 @@ public partial class MainPage : ContentPage
 
     private Grid? _headerRow;
 
+    /// <summary>Presentation wrapper: the template row plus its zebra-stripe colour.</summary>
+    private sealed record DisplayRow(TemplateRow Row, bool Alt)
+    {
+        public Color RowColor => Alt ? Color.FromArgb("#F4F8F7") : Colors.White;
+    }
+
     /// <summary>Renders the header from the template spec and feeds the rows to the
     /// virtualised list. Column widths are computed from the actual content, so nothing
     /// is truncated and no width is written in UI code.</summary>
@@ -189,6 +197,7 @@ public partial class MainPage : ContentPage
         ItemsView.ItemTemplate = new DataTemplate(() =>
         {
             var grid = new Grid();
+            grid.SetBinding(Grid.BackgroundColorProperty, nameof(DisplayRow.RowColor));
             for (var c = 0; c < widths.Length; c++)
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition(widths[c]));
@@ -196,17 +205,19 @@ public partial class MainPage : ContentPage
                 var label = new Label
                 {
                     FontSize = 12,
-                    Padding = new Thickness(4, 7),
+                    TextColor = Color.FromArgb("#1F2937"),
+                    Padding = new Thickness(6, 8),
                     HorizontalTextAlignment = left ? TextAlignment.Start : TextAlignment.Center,
                     LineBreakMode = LineBreakMode.NoWrap,
+                    VerticalTextAlignment = TextAlignment.Center,
                 };
-                label.SetBinding(Label.TextProperty, $"{nameof(TemplateRow.Cells)}[{c}]");
+                label.SetBinding(Label.TextProperty, $"{nameof(DisplayRow.Row)}.{nameof(TemplateRow.Cells)}[{c}]");
                 Grid.SetColumn(label, c);
                 grid.Add(label);
             }
             return new ViewCell { View = grid };
         });
-        ItemsView.ItemsSource = rows;
+        ItemsView.ItemsSource = rows.Select((r, i) => new DisplayRow(r, i % 2 == 1)).ToList();
     }
 
     private static double[] ComputeColumnWidths(IReadOnlyList<TemplateRow> rows)
@@ -228,7 +239,7 @@ public partial class MainPage : ContentPage
 
     private static Grid BuildTableRow(IReadOnlyList<string> cells, double[] widths, bool header)
     {
-        var grid = new Grid { BackgroundColor = header ? Colors.LightGray : Colors.White };
+        var grid = new Grid { BackgroundColor = header ? Color.FromArgb("#059669") : Colors.White };
 
         for (var c = 0; c < widths.Length; c++)
         {
@@ -238,11 +249,13 @@ public partial class MainPage : ContentPage
                 Text = c < cells.Count ? cells[c] : "",
                 FontSize = 12,
                 FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
-                Padding = new Thickness(4, header ? 8 : 7),
+                TextColor = header ? Colors.White : Color.FromArgb("#1F2937"),
+                Padding = new Thickness(6, header ? 10 : 8),
                 HorizontalTextAlignment = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0
                     ? TextAlignment.Start
                     : TextAlignment.Center,
                 LineBreakMode = LineBreakMode.NoWrap,
+                VerticalTextAlignment = TextAlignment.Center,
             };
             Grid.SetRow(label, 0);
             Grid.SetColumn(label, c);
