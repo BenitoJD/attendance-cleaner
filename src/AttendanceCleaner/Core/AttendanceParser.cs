@@ -41,6 +41,13 @@ public static partial class AttendanceParser
 
     public static ParsedReport Parse(string html)
     {
+        if (!html.Contains("</html", StringComparison.OrdinalIgnoreCase)
+            && !html.Contains("</body", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "This file looks incomplete (possibly a failed download). Please download the report from the attendance software again.");
+        }
+
         var doc = new HtmlDocument();
         doc.LoadHtml(NormalizeHtml(html));
 
