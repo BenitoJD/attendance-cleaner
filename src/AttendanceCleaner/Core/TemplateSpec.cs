@@ -38,5 +38,5 @@ public static class TemplateSpec
     // --- output file naming ---
 
     public const string DailyFileName = "Attendance_{0:dd-MM-yyyy}_Template.xlsx";
-    public const string MonthlyFileName = "Attendance_{0:MMMM 'yyyy'}_Template.xlsx";
+    public const string MonthlyFileName = "Attendance_{0:MMMM yyyy}_Template.xlsx";
 }

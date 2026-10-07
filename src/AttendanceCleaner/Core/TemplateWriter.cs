@@ -3,11 +3,49 @@ using ClosedXML.Excel;
 
 namespace AttendanceCleaner.Core;
 
+/// <summary>One fully formatted output row, as written to the Excel and shown in the app.</summary>
+public sealed record TemplateRow(
+    int SlNo,
+    string IdNo,
+    string Name,
+    string Gender,
+    string DateText,
+    string Day,
+    string? InPunch,
+    string? OutPunch,
+    string? TotalHours,
+    string Remark);
+
 /// <summary>
-/// Writes parsed attendance records into the template defined by <see cref="TemplateSpec"/>.
+/// Writes parsed attendance records into the template defined by <see cref="TemplateSpec"/>
+/// and exposes the same rows for in-app display.
 /// </summary>
 public static class TemplateWriter
 {
+    public static IReadOnlyList<TemplateRow> BuildRows(IEnumerable<AttendanceRecord> records)
+    {
+        var rows = new List<TemplateRow>();
+        foreach (var group in records.GroupBy(r => r.Date).OrderBy(g => g.Key))
+        {
+            var slNo = 1;
+            foreach (var record in group.OrderBy(r => r.Order))
+            {
+                rows.Add(new TemplateRow(
+                    SlNo: slNo++,
+                    IdNo: record.Id,
+                    Name: record.Name,
+                    Gender: string.IsNullOrEmpty(record.Gender) ? TemplateSpec.UnknownGender : record.Gender,
+                    DateText: record.Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture),
+                    Day: record.Date.ToString("ddd", CultureInfo.InvariantCulture),
+                    InPunch: record.InPunch,
+                    OutPunch: record.OutPunch,
+                    TotalHours: TotalHours(record.InPunch, record.OutPunch),
+                    Remark: Remark(record)));
+            }
+        }
+        return rows;
+    }
+
     public static void Write(IEnumerable<AttendanceRecord> records, Stream output)
     {
         using var workbook = new XLWorkbook();
@@ -22,13 +60,20 @@ public static class TemplateWriter
         ws.SheetView.FreezeRows(1);
 
         var row = 2;
-        foreach (var group in records.GroupBy(r => r.Date).OrderBy(g => g.Key))
+        foreach (var r in BuildRows(records))
         {
-            var slNo = 1;
-            foreach (var record in group.OrderBy(r => r.Order))
-            {
-                WriteRow(ws, row++, slNo++, record);
-            }
+            ws.Cell(row, 1).Value = r.SlNo;
+            ws.Cell(row, 2).Value =
+                long.TryParse(r.IdNo, out var id) ? XLCellValue.FromObject(id) : r.IdNo;
+            ws.Cell(row, 3).Value = r.Name;
+            ws.Cell(row, 4).Value = r.Gender;
+            ws.Cell(row, 5).Value = r.DateText;
+            ws.Cell(row, 6).Value = r.Day;
+            if (r.InPunch != null) ws.Cell(row, 7).Value = r.InPunch;
+            if (r.OutPunch != null) ws.Cell(row, 8).Value = r.OutPunch;
+            if (r.TotalHours != null) ws.Cell(row, 9).Value = r.TotalHours;
+            ws.Cell(row, 10).Value = r.Remark;
+            row++;
         }
 
         ws.Columns().AdjustToContents();
@@ -44,22 +89,6 @@ public static class TemplateWriter
     {
         using var stream = File.Create(path);
         Write(records, stream);
-    }
-
-    private static void WriteRow(IXLWorksheet ws, int row, int slNo, AttendanceRecord record)
-    {
-        ws.Cell(row, 1).Value = slNo;
-        ws.Cell(row, 2).Value =
-            long.TryParse(record.Id, out var id) ? XLCellValue.FromObject(id) : record.Id;
-        ws.Cell(row, 3).Value = record.Name;
-        ws.Cell(row, 4).Value = string.IsNullOrEmpty(record.Gender) ? TemplateSpec.UnknownGender : record.Gender;
-        ws.Cell(row, 5).Value = record.Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture);
-        ws.Cell(row, 6).Value = record.Date.ToString("ddd", CultureInfo.InvariantCulture);
-        if (record.InPunch != null) ws.Cell(row, 7).Value = record.InPunch;
-        if (record.OutPunch != null) ws.Cell(row, 8).Value = record.OutPunch;
-        var total = TotalHours(record.InPunch, record.OutPunch);
-        if (total != null) ws.Cell(row, 9).Value = total;
-        ws.Cell(row, 10).Value = Remark(record);
     }
 
     private static string Remark(AttendanceRecord record) =>

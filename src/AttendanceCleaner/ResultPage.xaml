@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:AttendanceCleaner"
+             x:Class="AttendanceCleaner.ResultPage"
+             Title="Converted">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="4">
+
+        <Label x:Name="SummaryLabel" FontAttributes="Bold" FontSize="17" />
+
+        <Label x:Name="SavedLabel" Grid.Row="1" FontSize="12" TextColor="#6B7280" />
+
+        <CollectionView x:Name="ItemsView" Grid.Row="2" Margin="0,8,0,0">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="local:ResultRow">
+                    <Border Stroke="#E5E7EB" StrokeShape="RoundRectangle 12" Margin="0,4" Padding="14,10">
+                        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="2" ColumnSpacing="8">
+                            <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="15" />
+                            <Label Grid.Column="1" Text="{Binding Remark}" FontAttributes="Bold" FontSize="13" TextColor="#6B7280">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Remark}" Value="Present">
+                                        <Setter Property="TextColor" Value="#059669" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Remark}" Value="Absent">
+                                        <Setter Property="TextColor" Value="#DC2626" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding Remark}" Value="In punch only">
+                                        <Setter Property="TextColor" Value="#D97706" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                            <Label Grid.Row="1" Text="{Binding Details}" FontSize="12" TextColor="#6B7280" />
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding Punches}" FontSize="12" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

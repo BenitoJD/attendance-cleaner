@@ -98,9 +98,10 @@ public partial class MainPage : ContentPage
             var scope = result.dates.Count > 1
                 ? $"{result.dates.Count} days ({result.dates[0]:dd-MM-yyyy} to {result.dates[^1]:dd-MM-yyyy})"
                 : $"{result.dates[0]:dd-MM-yyyy}";
-            StatusLabel.Text = $"Done: {result.report.Records.Count} rows for {scope}. Saved as:\n{Path.GetFileName(result.outputPath)}";
-            FileNameLabel.Text = "";
-            _selectedFile = null;
+            StatusLabel.Text = $"Done: {result.report.Records.Count} rows for {scope}.";
+
+            var rows = TemplateWriter.BuildRows(result.report.Records);
+            await Navigation.PushAsync(new ResultPage(rows, scope, Path.GetFileName(result.outputPath)));
         }
         catch (Exception ex)
         {
