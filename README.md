@@ -29,6 +29,10 @@ dotnet build src/AttendanceCleaner -f net10.0-maccatalyst
 
 The Windows target (`net10.0-windows10.0.19041.0`) only builds on Windows.
 
+## Windows executable
+
+The GitHub Actions workflow (`.github/workflows/windows-build.yml`) builds a self-contained win-x64 exe on every push to `main` (or manually via *Run workflow*). Download it from the run's **Artifacts** section on the [Actions page](https://github.com/BenitoJD/attendance-cleaner/actions) — it's a zip you can extract and run on any Windows 10/11 PC, no .NET install needed.
+
 ## Layout
 
 ```
