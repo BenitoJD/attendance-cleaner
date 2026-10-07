@@ -107,7 +107,7 @@ public partial class MainPage : ContentPage
             SummaryLabel.Text = $"{rows.Count} rows · {present} present · {absent} absent"
                 + (inOnly > 0 ? $" · {inOnly} in-punch-only" : "");
             SavedLabel.Text = $"{scope} · Saved as: {Path.GetFileName(result.outputPath)}";
-            BindingContext = new { Rows = rows };
+            BuildTable(rows);
 
             ConvertSection.IsVisible = false;
             ResultsSection.IsVisible = true;
@@ -133,5 +133,53 @@ public partial class MainPage : ContentPage
         FileNameLabel.Text = "";
         StatusLabel.Text = "";
         ConvertBtn.IsEnabled = false;
+    }
+
+    /// <summary>Renders the header and every row from the template spec — nothing about the
+    /// column layout is written in UI code.</summary>
+    private void BuildTable(IReadOnlyList<TemplateRow> rows)
+    {
+        var widths = TemplateSpec.PreviewColumnWidths;
+        TableLayout.WidthRequest = widths.Sum() + 2;
+
+        TableLayout.Add(BuildTableRow(TemplateSpec.Headers, header: true));
+        foreach (var row in rows)
+        {
+            TableLayout.Add(BuildTableRow(row.Cells, header: false));
+        }
+    }
+
+    private static Grid BuildTableRow(IReadOnlyList<string> cells, bool header)
+    {
+        var widths = TemplateSpec.PreviewColumnWidths;
+        var grid = new Grid { BackgroundColor = header ? Colors.LightGray : Colors.White };
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        grid.RowDefinitions.Add(new RowDefinition(1));
+
+        for (var c = 0; c < widths.Length; c++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(widths[c]));
+            var label = new Label
+            {
+                Text = c < cells.Count ? cells[c] : "",
+                FontSize = 12,
+                FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
+                Padding = new Thickness(4, header ? 8 : 7),
+                HorizontalTextAlignment = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0
+                    ? TextAlignment.Start
+                    : TextAlignment.Center,
+                LineBreakMode = LineBreakMode.TailTruncation,
+            };
+            Grid.SetRow(label, 0);
+            Grid.SetColumn(label, c);
+            grid.Add(label);
+        }
+
+        var separator = new BoxView { Color = Colors.LightGray, HeightRequest = 1 };
+        Grid.SetRow(separator, 1);
+        Grid.SetColumn(separator, 0);
+        Grid.SetColumnSpan(separator, widths.Length);
+        grid.Add(separator);
+        return grid;
     }
 }

@@ -14,7 +14,23 @@ public sealed record TemplateRow(
     string? InPunch,
     string? OutPunch,
     string? TotalHours,
-    string Remark);
+    string Remark)
+{
+    /// <summary>Cell values in TemplateSpec.Headers order (empty string where the sheet is blank).</summary>
+    public string[] Cells => new[]
+    {
+        SlNo.ToString(CultureInfo.InvariantCulture),
+        IdNo,
+        Name,
+        Gender,
+        DateText,
+        Day,
+        InPunch ?? "",
+        OutPunch ?? "",
+        TotalHours ?? "",
+        Remark,
+    };
+}
 
 /// <summary>
 /// Writes parsed attendance records into the template defined by <see cref="TemplateSpec"/>

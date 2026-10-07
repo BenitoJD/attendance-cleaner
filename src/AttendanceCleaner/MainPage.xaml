@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:core="clr-namespace:AttendanceCleaner.Core"
              x:Class="AttendanceCleaner.MainPage"
              Title="Attendance Cleaner">
 
@@ -74,43 +73,9 @@
                 Clicked="OnConvertAnotherClicked" />
 
             <ScrollView Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
-                <Grid RowDefinitions="Auto,Auto" WidthRequest="745" RowSpacing="0">
-
-                    <Grid ColumnDefinitions="45,55,170,55,90,45,65,65,70,85" BackgroundColor="#F3F4F6">
-                        <Label Text="Sl.No" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="1" Text="ID No" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="2" Text="Name" FontAttributes="Bold" FontSize="12" Padding="8,8" />
-                        <Label Grid.Column="3" Text="Genter" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="4" Text="Date" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="5" Text="Day" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="6" Text="In punch" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="7" Text="Out punch" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="8" Text="Total hours" FontAttributes="Bold" FontSize="12" Padding="4,8" HorizontalTextAlignment="Center" />
-                        <Label Grid.Column="9" Text="Remarks" FontAttributes="Bold" FontSize="12" Padding="4,8" />
-                    </Grid>
-
-                    <ScrollView Grid.Row="1">
-                        <StackLayout BindableLayout.ItemsSource="{Binding Rows}">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="core:TemplateRow">
-                                    <Grid RowDefinitions="Auto,1" ColumnDefinitions="45,55,170,55,90,45,65,65,70,85" BackgroundColor="White">
-                                        <Label Text="{Binding SlNo}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="1" Text="{Binding IdNo}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="2" Text="{Binding Name}" FontSize="12" Padding="8,7" LineBreakMode="TailTruncation" />
-                                        <Label Grid.Column="3" Text="{Binding Gender}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="4" Text="{Binding DateText}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="5" Text="{Binding Day}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="6" Text="{Binding InPunch}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="7" Text="{Binding OutPunch}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="8" Text="{Binding TotalHours}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
-                                        <Label Grid.Column="9" Text="{Binding Remark}" FontSize="12" Padding="4,7" />
-                                        <BoxView Grid.Row="1" Grid.ColumnSpan="10" HeightRequest="1" Color="#E5E7EB" />
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </StackLayout>
-                    </ScrollView>
-                </Grid>
+                <ScrollView x:Name="TableVerticalScroll">
+                    <StackLayout x:Name="TableLayout" Spacing="0" />
+                </ScrollView>
             </ScrollView>
         </Grid>
 

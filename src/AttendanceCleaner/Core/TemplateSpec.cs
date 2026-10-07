@@ -35,6 +35,14 @@ public static class TemplateSpec
     /// <summary>Written when the source report does not state the gender (monthly exports don't).</summary>
     public const string UnknownGender = "-";
 
+    // --- on-screen spreadsheet preview (driven by the same Headers/rows as the file) ---
+
+    /// <summary>Column widths for the preview table, in Headers order.</summary>
+    public static readonly double[] PreviewColumnWidths = { 45, 55, 170, 55, 90, 45, 65, 65, 70, 85 };
+
+    /// <summary>Header indexes shown left-aligned; the rest are centred.</summary>
+    public static readonly int[] PreviewLeftAlignedColumns = { 2, 9 };
+
     // --- output file naming ---
 
     public const string DailyFileName = "Attendance_{0:dd-MM-yyyy}_Template.xlsx";
