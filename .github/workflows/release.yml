@@ -1,0 +1,82 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v1.0.1)'
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run tests
+        run: dotnet test tools/AttendanceCleaner.Tests
+
+  release:
+    needs: test
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui
+
+      - name: Publish Windows exe (self-contained win-x64)
+        run: >
+          dotnet publish src/AttendanceCleaner
+          -c Release
+          -f net10.0-windows10.0.19041.0
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x64
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
+
+      - name: Publish Windows exe (self-contained win-x86, 32-bit)
+        run: >
+          dotnet publish src/AttendanceCleaner
+          -c Release
+          -f net10.0-windows10.0.19041.0
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x86
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
+
+      - name: Zip both builds
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
+          Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+
+      - name: Create GitHub release with both installers
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ inputs.version }}" }
+          $notes = @"
+          Attendance Cleaner $tag
+
+          Download, unzip, run AttendanceCleaner.exe — nothing else to install.
+
+          - AttendanceCleaner-win-x64.zip — 64-bit Windows 10 (1809+) / Windows 11 (almost every modern PC)
+          - AttendanceCleaner-win-x86.zip — 32-bit Windows 10 (1809+); also runs on 64-bit Windows if unsure which to pick
+          "@
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
