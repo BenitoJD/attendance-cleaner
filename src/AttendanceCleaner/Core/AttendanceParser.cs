@@ -9,12 +9,28 @@ namespace AttendanceCleaner.Core;
 /// Three export layouts are recognised: the daily report (one row per employee),
 /// the monthly block report (one block of rows per employee, days as columns) and
 /// the monthly performance report (metric rows per employee, days as columns).
+/// Label matching is case-insensitive so minor software updates can't break parsing.
 /// </summary>
 public static partial class AttendanceParser
 {
-    private static readonly HashSet<string> BlockFieldLabels = new()
+    // Row/section labels used by the software's exports (matched case-insensitively).
+    private const string LabelPersonId = "Person ID";
+    private const string LabelEmployeeName = "Employee Name";
+    private const string LabelDepartment = "Department";
+    private const string LabelJoiningDate = "Joining Date";
+    private const string LabelPosition = "Position";
+    private const string LabelNo = "No.";
+    private const string LabelName = "Name";
+    private const string LabelGender = "Gender";
+    private const string LabelDate = "Date";
+    private const string LabelCheckIn = "Check-in1";
+    private const string LabelCheckOut = "Check-out1";
+    private const string LabelCheckInPrefix = "Check-in";
+    private const string LabelStatus = "Status";
+
+    private static readonly HashSet<string> BlockFieldLabels = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Person ID", "Employee Name", "Department", "Joining Date", "Position",
+        LabelPersonId, LabelEmployeeName, LabelDepartment, LabelJoiningDate, LabelPosition,
     };
 
     public static ParsedReport ParseFile(string path)
@@ -37,7 +53,7 @@ public static partial class AttendanceParser
         {
             return new ParsedReport(AttendanceExportFormat.DailyReport, ParseDaily(tables, daily));
         }
-        if (tables.Any(t => t.Any(r => Cell(r, 0) == "Person ID")))
+        if (tables.Any(t => t.Any(r => Same(Cell(r, 0), LabelPersonId))))
         {
             return new ParsedReport(AttendanceExportFormat.MonthlyBlocks, ParseMonthlyBlocks(tables, html));
         }
@@ -50,21 +66,24 @@ public static partial class AttendanceParser
             "The file does not look like an attendance export. Expected the software's Daily or Monthly report (.xls).");
     }
 
+    private static bool Same(string? a, string b) =>
+        string.Equals(a?.Trim(), b, StringComparison.OrdinalIgnoreCase);
+
     // --- Daily report: title table, then a table of one row per employee ---
 
     private static List<string>? FindDailyHeader(List<List<List<string>>> tables) =>
         tables.SelectMany(t => t)
-            .FirstOrDefault(r => Cell(r, 1) == "Person ID" && r.Any(c => c.StartsWith("Check-in")));
+            .FirstOrDefault(r => Same(Cell(r, 1), LabelPersonId) && r.Any(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase)));
 
     private static List<AttendanceRecord> ParseDaily(List<List<List<string>>> tables, List<string> header)
     {
-        int ixNo = IndexOf(header, "No.");
-        int ixId = header.IndexOf("Person ID");
-        int ixName = IndexOf(header, "Name");
-        int ixGender = IndexOf(header, "Gender");
-        int ixDate = IndexOf(header, "Date");
-        int ixIn = header.FindIndex(c => c.StartsWith("Check-in"));
-        int ixOut = header.FindIndex(c => c.StartsWith("Check-out"));
+        int ixNo = FindIndex(header, LabelNo);
+        int ixId = FindIndex(header, LabelPersonId);
+        int ixName = FindIndex(header, LabelName);
+        int ixGender = FindIndex(header, LabelGender);
+        int ixDate = FindIndex(header, LabelDate);
+        int ixIn = header.FindIndex(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase));
+        int ixOut = header.FindIndex(c => c.StartsWith("Check-out", StringComparison.OrdinalIgnoreCase));
 
         var records = new List<AttendanceRecord>();
         int order = 0;
@@ -83,7 +102,7 @@ public static partial class AttendanceParser
             records.Add(new AttendanceRecord(
                 Id: Cell(row, ixId),
                 Name: Cell(row, ixName),
-                Gender: Cell(row, ixGender) is { Length: > 0 } g ? g : "-",
+                Gender: Cell(row, ixGender) is { Length: > 0 } g ? g : TemplateSpec.UnknownGender,
                 Date: date,
                 InPunch: NormalizePunch(Cell(row, ixIn)),
                 OutPunch: NormalizePunch(Cell(row, ixOut)),
@@ -92,7 +111,7 @@ public static partial class AttendanceParser
         return records;
     }
 
-    // --- Monthly block report: one block of 10 rows per employee, days as columns ---
+    // --- Monthly block report: one block of rows per employee, days as columns ---
 
     private static List<AttendanceRecord> ParseMonthlyBlocks(List<List<List<string>>> tables, string html)
     {
@@ -112,47 +131,46 @@ public static partial class AttendanceParser
                 if (!TryMakeDate(Year, Month, day, out var date)) continue;
                 ins!.TryGetValue(col, out var tin);
                 outs!.TryGetValue(col, out var tout);
-                records.Add(new AttendanceRecord(id, name, "-", date,
+                records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
                     NormalizePunch(tin), NormalizePunch(tout), Order: blockIndex));
             }
         }
 
         foreach (var row in tables.SelectMany(t => t))
         {
-            switch (Cell(row, 0))
+            var label = Cell(row, 0);
+            if (Same(label, LabelPersonId))
             {
-                case "Person ID":
-                    Flush();
-                    blockIndex++;
-                    dayByColumn = null;
-                    ins = new Dictionary<int, string>();
-                    outs = new Dictionary<int, string>();
-                    (id, name) = ExtractBlockIdentity(row);
-                    break;
-
-                case "Date" when blockIndex >= 0:
-                    dayByColumn = new Dictionary<int, int>();
-                    for (int c = 1; c < row.Count; c++)
+                Flush();
+                blockIndex++;
+                dayByColumn = null;
+                ins = new Dictionary<int, string>();
+                outs = new Dictionary<int, string>();
+                (id, name) = ExtractBlockIdentity(row);
+            }
+            else if (Same(label, LabelDate) && blockIndex >= 0)
+            {
+                dayByColumn = new Dictionary<int, int>();
+                for (int c = 1; c < row.Count; c++)
+                {
+                    if (int.TryParse(Cell(row, c), out var day) && day is >= 1 and <= 31)
                     {
-                        if (int.TryParse(Cell(row, c), out var day) && day is >= 1 and <= 31)
-                        {
-                            dayByColumn[c] = day;
-                        }
+                        dayByColumn[c] = day;
                     }
-                    break;
-
-                case "Check-in1" when dayByColumn != null:
-                    foreach (var col in dayByColumn.Keys) ins![col] = Cell(row, col);
-                    break;
-
-                case "Check-out1" when dayByColumn != null:
-                    foreach (var col in dayByColumn.Keys) outs![col] = Cell(row, col);
-                    break;
-
-                case "Status" when dayByColumn != null:
-                    Flush();
-                    dayByColumn = null;
-                    break;
+                }
+            }
+            else if (Same(label, LabelCheckIn) && dayByColumn != null)
+            {
+                foreach (var col in dayByColumn.Keys) ins![col] = Cell(row, col);
+            }
+            else if (Same(label, LabelCheckOut) && dayByColumn != null)
+            {
+                foreach (var col in dayByColumn.Keys) outs![col] = Cell(row, col);
+            }
+            else if (Same(label, LabelStatus) && dayByColumn != null)
+            {
+                Flush();
+                dayByColumn = null;
             }
         }
         Flush();
@@ -184,7 +202,7 @@ public static partial class AttendanceParser
         foreach (var table in tables)
         foreach (var row in table)
         {
-            if (Cell(row, 0) != "No." || !row.Contains("Person ID")) continue;
+            if (!Same(Cell(row, 0), LabelNo) || !row.Any(c => Same(c, LabelPersonId))) continue;
             var dayColumns = new List<int>();
             for (int c = 0; c < row.Count; c++)
             {
@@ -202,9 +220,9 @@ public static partial class AttendanceParser
         List<List<List<string>>> tables, List<string> header, List<int> dayColumns, string html)
     {
         (int Year, int Month) = MonthOf(html);
-        int ixNo = IndexOf(header, "No.");
-        int ixId = header.IndexOf("Person ID");
-        int ixName = IndexOf(header, "Name");
+        int ixNo = FindIndex(header, LabelNo);
+        int ixId = FindIndex(header, LabelPersonId);
+        int ixName = FindIndex(header, LabelName);
         int labelColumn = ixName + 1;
 
         var rows = tables.SelectMany(t => t)
@@ -217,7 +235,9 @@ public static partial class AttendanceParser
         foreach (var row in rows)
         {
             var label = Cell(row, labelColumn);
-            if (label is not ("Check-in1" or "Check-out1")) continue;
+            var isCheckIn = Same(label, LabelCheckIn);
+            var isCheckOut = Same(label, LabelCheckOut);
+            if (!isCheckIn && !isCheckOut) continue;
             if (!int.TryParse(Cell(row, ixNo), out var no)) continue;
 
             var key = $"{Cell(row, ixNo)}|{Cell(row, ixId)}|{Cell(row, ixName)}";
@@ -229,7 +249,7 @@ public static partial class AttendanceParser
             }
             var values = new Dictionary<int, string>();
             foreach (var col in dayColumns) values[col] = Cell(row, col);
-            metrics[label] = values;
+            metrics[isCheckIn ? LabelCheckIn : LabelCheckOut] = values;
         }
 
         var records = new List<AttendanceRecord>();
@@ -237,15 +257,15 @@ public static partial class AttendanceParser
         {
             var parts = key.Split('|');
             string id = parts[1], name = parts[2];
-            var ins = metrics.GetValueOrDefault("Check-in1") ?? new Dictionary<int, string>();
-            var outs = metrics.GetValueOrDefault("Check-out1") ?? new Dictionary<int, string>();
+            var ins = metrics.GetValueOrDefault(LabelCheckIn) ?? new Dictionary<int, string>();
+            var outs = metrics.GetValueOrDefault(LabelCheckOut) ?? new Dictionary<int, string>();
             foreach (var col in dayColumns)
             {
                 var day = int.Parse(Cell(header, col));
                 if (!TryMakeDate(Year, Month, day, out var date)) continue;
                 ins.TryGetValue(col, out var tin);
                 outs.TryGetValue(col, out var tout);
-                records.Add(new AttendanceRecord(id, name, "-", date,
+                records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
                     NormalizePunch(tin), NormalizePunch(tout), Order: order[key]));
             }
         }
@@ -314,7 +334,8 @@ public static partial class AttendanceParser
     private static string Cell(List<string> row, int index) =>
         index >= 0 && index < row.Count ? row[index] : "";
 
-    private static int IndexOf(List<string> row, string value) => row.IndexOf(value);
+    private static int FindIndex(List<string> row, string value) =>
+        row.FindIndex(c => Same(c, value));
 
     private static string? NormalizePunch(string? value)
     {
@@ -335,7 +356,7 @@ public static partial class AttendanceParser
     }
 
     private static bool TryParseDate(string value, out DateOnly date) =>
-        DateOnly.TryParseExact(value, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+        DateOnly.TryParseExact(value, TemplateSpec.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
     private static bool TryMakeDate(int year, int month, int day, out DateOnly date)
     {

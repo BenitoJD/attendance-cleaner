@@ -1,4 +1,5 @@
-﻿using AttendanceCleaner.Core;
+﻿using System.Globalization;
+using AttendanceCleaner.Core;
 
 namespace AttendanceCleaner;
 
@@ -80,9 +81,10 @@ public partial class MainPage : ContentPage
                 }
 
                 // one date -> daily file name; a range -> monthly file name
-                var fileName = dates.Count > 1
-                    ? $"Attendance_{dates[0]:MMMM 'yyyy'}_Template.xlsx"
-                    : $"Attendance_{dates[0]:dd-MM-yyyy}_Template.xlsx";
+                var fileName = string.Format(
+                    CultureInfo.InvariantCulture,
+                    dates.Count > 1 ? TemplateSpec.MonthlyFileName : TemplateSpec.DailyFileName,
+                    dates[0]);
 
                 var directory = Path.GetDirectoryName(_selectedFile.FullPath);
                 if (string.IsNullOrEmpty(directory)) directory = FileSystem.AppDataDirectory;
