@@ -45,10 +45,31 @@ jobs:
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
 
-      - name: Zip publish output
+      - name: Zip win-x64 publish output
         run: Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
 
       - uses: actions/upload-artifact@v4
         with:
           name: AttendanceCleaner-win-x64
           path: AttendanceCleaner-win-x64.zip
+
+      # 32-bit (x86) Windows: the Windows App SDK dropped x86 support in version 1.6,
+      # so this step verifies whether the current SDK can still produce a 32-bit build.
+      - name: Publish Windows exe (self-contained win-x86, 32-bit)
+        run: >
+          dotnet publish src/AttendanceCleaner
+          -c Release
+          -f net10.0-windows10.0.19041.0
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x86
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
+
+      - name: Zip win-x86 publish output
+        run: Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AttendanceCleaner-win-x86
+          path: AttendanceCleaner-win-x86.zip
