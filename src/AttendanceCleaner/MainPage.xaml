@@ -1,45 +1,32 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="AttendanceCleaner.MainPage">
+             x:Class="AttendanceCleaner.MainPage"
+             Title="Attendance Cleaner">
 
-    <ScrollView>
+    <Grid>
         <VerticalStackLayout
-            Padding="30,0"
-            Spacing="25">
+            VerticalOptions="Center"
+            Padding="40"
+            Spacing="20">
+
             <Label
                 Text="Attendance Cleaner"
-                Style="{StaticResource Headline}"
-                SemanticProperties.HeadingLevel="Level1" />
+                FontSize="28"
+                FontAttributes="Bold"
+                HorizontalTextAlignment="Center" />
 
             <Label
-                Text="Upload the attendance report downloaded from the software and get a clean Excel in the new template format."
-                Style="{StaticResource SubHeadline}"
-                SemanticProperties.HeadingLevel="Level2"
-                SemanticProperties.Description="Welcome to Attendance Cleaner" />
-
-            <Picker
-                x:Name="ReportTypePicker"
-                Title="Report type"
-                SelectedIndex="1">
-                <Picker.ItemsSource>
-                    <x:Array Type="{x:Type x:String}">
-                        <x:String>Daily report</x:String>
-                        <x:String>Monthly report</x:String>
-                    </x:Array>
-                </Picker.ItemsSource>
-            </Picker>
+                Text="Choose the report downloaded from the attendance software. The clean Excel is saved next to it."
+                FontSize="15"
+                TextColor="Gray"
+                HorizontalTextAlignment="Center" />
 
             <Button
                 x:Name="PickFileBtn"
-                Text="Choose attendance file"
+                Text="Choose Excel file"
                 Clicked="OnPickFileClicked"
                 HorizontalOptions="Fill" />
-
-            <Label
-                x:Name="FileNameLabel"
-                Text="No file selected"
-                HorizontalTextAlignment="Center" />
 
             <Button
                 x:Name="ConvertBtn"
@@ -49,10 +36,24 @@
                 HorizontalOptions="Fill" />
 
             <Label
+                x:Name="FileNameLabel"
+                Text=""
+                FontSize="13"
+                HorizontalTextAlignment="Center" />
+
+            <Label
                 x:Name="StatusLabel"
                 Text=""
+                FontSize="13"
                 HorizontalTextAlignment="Center" />
         </VerticalStackLayout>
-    </ScrollView>
+
+        <ActivityIndicator
+            x:Name="Spinner"
+            IsRunning="False"
+            IsVisible="False"
+            VerticalOptions="Center"
+            HorizontalOptions="Center" />
+    </Grid>
 
 </ContentPage>

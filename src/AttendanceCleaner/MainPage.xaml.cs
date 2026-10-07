@@ -51,6 +51,9 @@ public partial class MainPage : ContentPage
         if (_selectedFile is null) return;
 
         ConvertBtn.IsEnabled = false;
+        PickFileBtn.IsEnabled = false;
+        Spinner.IsVisible = true;
+        Spinner.IsRunning = true;
         StatusLabel.Text = "Converting...";
 
         try
@@ -66,7 +69,7 @@ public partial class MainPage : ContentPage
                 if (!html.Contains('<') || !html.Contains("table", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidDataException(
-                        "This file is not a recognised attendance export. Please upload the .xls file downloaded from the attendance software.");
+                        "This file is not a recognised attendance export. Please choose the .xls file downloaded from the attendance software.");
                 }
 
                 var report = AttendanceParser.Parse(html);
@@ -76,8 +79,8 @@ public partial class MainPage : ContentPage
                     throw new InvalidDataException("No attendance rows were found in this file.");
                 }
 
-                var isMonthly = ReportTypePicker.SelectedIndex == 1;
-                var fileName = isMonthly
+                // one date -> daily file name; a range -> monthly file name
+                var fileName = dates.Count > 1
                     ? $"Attendance_{dates[0]:MMMM 'yyyy'}_Template.xlsx"
                     : $"Attendance_{dates[0]:dd-MM-yyyy}_Template.xlsx";
 
@@ -93,7 +96,9 @@ public partial class MainPage : ContentPage
             var scope = result.dates.Count > 1
                 ? $"{result.dates.Count} days ({result.dates[0]:dd-MM-yyyy} to {result.dates[^1]:dd-MM-yyyy})"
                 : $"{result.dates[0]:dd-MM-yyyy}";
-            StatusLabel.Text = $"Done: {result.report.Records.Count} rows for {scope}. Saved to:\n{result.outputPath}";
+            StatusLabel.Text = $"Done: {result.report.Records.Count} rows for {scope}. Saved as:\n{Path.GetFileName(result.outputPath)}";
+            FileNameLabel.Text = "";
+            _selectedFile = null;
         }
         catch (Exception ex)
         {
@@ -101,7 +106,10 @@ public partial class MainPage : ContentPage
         }
         finally
         {
-            ConvertBtn.IsEnabled = true;
+            Spinner.IsVisible = false;
+            Spinner.IsRunning = false;
+            ConvertBtn.IsEnabled = _selectedFile != null;
+            PickFileBtn.IsEnabled = true;
         }
     }
 }
