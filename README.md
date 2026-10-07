@@ -55,11 +55,12 @@ dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.x
 
 ## Windows executable
 
-The GitHub Actions workflow (`.github/workflows/windows-build.yml`) tests the core engine and builds a **self-contained win-x64 exe** on every push to `main` (or manually via *Run workflow*). Download `AttendanceCleaner-win-x64` from the run's **Artifacts** section on the [Actions page](https://github.com/BenitoJD/attendance-cleaner/actions), unzip it anywhere, and run `AttendanceCleaner.exe`.
+The GitHub Actions workflow (`.github/workflows/windows-build.yml`) tests the core engine and builds **self-contained Windows exes** on every push to `main` (or manually via *Run workflow*). Download from the run's **Artifacts** section on the [Actions page](https://github.com/BenitoJD/attendance-cleaner/actions), unzip anywhere, and run `AttendanceCleaner.exe`.
 
-- **No dependencies**: the zip carries the .NET runtime and Windows App SDK — nothing to install on the machine.
-- **Compatibility**: any 64-bit Windows 10 (1809+) or Windows 11 PC. Windows-on-ARM machines run it through their built-in x64 emulation.
-- On first save the app opens a normal Windows **Save as** dialog, so each user picks their preferred folder; afterwards the choice is remembered per conversion.
+- **No dependencies**: each zip carries the .NET runtime and Windows App SDK — nothing to install on the machine.
+- `AttendanceCleaner-win-x64` → 64-bit Windows 10 (1809+) / Windows 11 — use this on almost every modern PC.
+- `AttendanceCleaner-win-x86` → 32-bit Windows 10 (1809+) — for older 32-bit machines.
+- Not sure which? On the target PC open **Settings → System → About → System type**. A 64-bit Windows can also run the 32-bit build, so when in doubt the x86 zip works everywhere.
 
 ## Layout
 

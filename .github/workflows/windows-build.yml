@@ -53,8 +53,7 @@ jobs:
           name: AttendanceCleaner-win-x64
           path: AttendanceCleaner-win-x64.zip
 
-      # 32-bit (x86) Windows: the Windows App SDK dropped x86 support in version 1.6,
-      # so this step verifies whether the current SDK can still produce a 32-bit build.
+      # 32-bit (x86) Windows machines get their own self-contained build
       - name: Publish Windows exe (self-contained win-x86, 32-bit)
         run: >
           dotnet publish src/AttendanceCleaner
