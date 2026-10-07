@@ -1,10 +1,24 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+artifacts/
 
-# data files - attendance data is sensitive, keep it out of the repo
-input/*
-output/*
-!input/.gitkeep
-!output/.gitkeep
+## .NET MAUI
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.app/
+*.pkg
+
+## macOS
+.DS_Store
+
+## Test results
+TestResults/
+[Ll]ogs/

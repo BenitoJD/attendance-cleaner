@@ -1,35 +1,37 @@
 # attendance-cleaner
 
-Takes raw attendance Excel files, removes unwanted columns/rows, and writes a clean Excel file.
+A .NET MAUI app that cleans attendance Excel files: pick a file, strip unwanted columns/rows, and save a new, clean Excel file.
 
-## How it works
+## Status
 
-1. Drop input `.xlsx` files into `input/`.
-2. Edit `config.json` to describe the cleanup rules (columns to drop, rows to skip, sheets to keep, output columns).
-3. Run the cleaner — cleaned files land in `output/`.
+Scaffolded with .NET MAUI on .NET 10 (`src/AttendanceCleaner`). Excel cleanup logic (file picking, column/row removal) comes next.
+
+## Development
+
+Requires the .NET SDK with the MAUI workload:
 
 ```bash
-pip install -r requirements.txt
-python clean_attendance.py
+dotnet workload install maui
 ```
 
-## Configuration
+Build/run for Android (works out of the box on this Mac; the SDK lives in `~/.android-sdk`):
 
-`config.json` controls everything, so new file layouts don't require code changes:
+```bash
+dotnet build src/AttendanceCleaner -f net10.0-android -p:AndroidSdkDirectory="$HOME/.android-sdk"
+dotnet build -t:Run -f net10.0-android -p:AndroidSdkDirectory="$HOME/.android-sdk"   # run on emulator/device
+```
 
-| Key | What it does |
-| --- | --- |
-| `drop_columns` | Column names/letters to remove |
-| `drop_rows_containing` | Remove any row where a cell contains one of these values |
-| `skip_top_rows` | Number of header/junk rows to skip at the top |
-| `keep_sheets` | Only process these sheet names (empty = all sheets) |
-| `output_columns` | Exact column order for the output file (empty = keep as-is) |
+Build for Mac Catalyst / iOS requires full Xcode (not just Command Line Tools) installed on this Mac:
+
+```bash
+dotnet build src/AttendanceCleaner -f net10.0-maccatalyst
+```
+
+The Windows target (`net10.0-windows10.0.19041.0`) only builds on Windows.
 
 ## Layout
 
 ```
-input/                  # raw attendance Excel files go here
-output/                 # cleaned files are written here
-config.json             # cleanup rules
-clean_attendance.py     # the cleaner
+AttendanceCleaner.slnx
+src/AttendanceCleaner/    # the MAUI app
 ```
