@@ -59,7 +59,7 @@ jobs:
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
 
-      # the headline artifact: ONE exe with everything bundled inside
+      # the headline artifacts: ONE exe per architecture, everything bundled inside
       - name: Publish single-file exe (win-x64)
         run: >
           dotnet publish src/AttendanceCleaner
@@ -74,13 +74,28 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true
 
+      - name: Publish single-file exe (win-x86, 32-bit)
+        run: >
+          dotnet publish src/AttendanceCleaner
+          -c Release
+          -f net10.0-windows10.0.19041.0
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x86
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+
       - name: Rename and stage release files
         shell: pwsh
         run: |
-          $sf = 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/AttendanceCleaner.exe'
-          $sfSize = (Get-Item $sf).Length
-          Write-Host "single-file exe size: $([math]::Round($sfSize/1MB,1)) MB"
-          Copy-Item $sf 'AttendanceCleaner.exe'
+          $x64 = 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/AttendanceCleaner.exe'
+          $x86 = 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/AttendanceCleaner.exe'
+          Write-Host "x64 single-file: $([math]::Round((Get-Item $x64).Length/1MB,1)) MB, x86 single-file: $([math]::Round((Get-Item $x86).Length/1MB,1)) MB"
+          Copy-Item $x64 'AttendanceCleaner-x64.exe'
+          Copy-Item $x86 'AttendanceCleaner-x86.exe'
           Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
           Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
 
@@ -93,8 +108,11 @@ jobs:
           $notes = @"
           Attendance Cleaner $tag
 
-          - AttendanceCleaner.exe — THE ONE TO USE: a single file, everything bundled. Download and double-click, that's all.
-          - AttendanceCleaner-win-x64.zip — same app as a folder of files (fallback if the single exe is blocked on very locked-down PCs)
-          - AttendanceCleaner-win-x86.zip — 32-bit Windows fallback
+          Single-file executables - download and double-click, that's all:
+          - AttendanceCleaner-x64.exe - 64-bit Windows 10/11 (almost every modern PC)
+          - AttendanceCleaner-x86.exe - 32-bit Windows (also runs on 64-bit if unsure which to pick)
+
+          Folder fallbacks for locked-down corporate PCs:
+          - AttendanceCleaner-win-x64.zip / AttendanceCleaner-win-x86.zip
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-x64.exe AttendanceCleaner-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
