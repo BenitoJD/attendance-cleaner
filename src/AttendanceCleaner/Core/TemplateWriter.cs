@@ -79,8 +79,11 @@ public static class TemplateWriter
         foreach (var r in BuildRows(records))
         {
             ws.Cell(row, 1).Value = r.SlNo;
+            // IDs with leading zeros (e.g. "0013") must stay text or the zeros are lost
             ws.Cell(row, 2).Value =
-                long.TryParse(r.IdNo, out var id) ? XLCellValue.FromObject(id) : r.IdNo;
+                long.TryParse(r.IdNo, out var id) && !KeepsLeadingZeros(r.IdNo)
+                    ? XLCellValue.FromObject(id)
+                    : r.IdNo;
             ws.Cell(row, 3).Value = r.Name;
             ws.Cell(row, 4).Value = r.Gender;
             ws.Cell(row, 5).Value = r.DateText;
@@ -115,10 +118,16 @@ public static class TemplateWriter
     private static string? TotalHours(string? inPunch, string? outPunch)
     {
         if (inPunch == null || outPunch == null) return null;
-        var tin = TimeOnly.ParseExact(inPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
-        var tout = TimeOnly.ParseExact(outPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
+        if (!TimeOnly.TryParseExact(inPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tin)
+            || !TimeOnly.TryParseExact(outPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tout))
+        {
+            return null;
+        }
         var minutes = (int)(tout - tin).TotalMinutes;
         if (minutes < 0) minutes += 24 * 60; // punches crossing midnight
         return $"{minutes / 60:00}:{minutes % 60:00}";
     }
+
+    private static bool KeepsLeadingZeros(string id) =>
+        id.Length > 1 && id[0] == '0' && id.All(char.IsDigit);
 }

@@ -115,7 +115,7 @@ public static partial class AttendanceParser
 
     private static List<AttendanceRecord> ParseMonthlyBlocks(List<List<List<string>>> tables, string html)
     {
-        (int Year, int Month) = MonthOf(html);
+        var from = StartDateOf(html);
         var records = new List<AttendanceRecord>();
 
         int blockIndex = -1;
@@ -126,9 +126,11 @@ public static partial class AttendanceParser
         void Flush()
         {
             if (dayByColumn == null) return;
-            foreach (var (col, day) in dayByColumn.OrderBy(kv => kv.Value))
+            var ordered = dayByColumn.OrderBy(kv => kv.Key).ToList();
+            for (var i = 0; i < ordered.Count; i++)
             {
-                if (!TryMakeDate(Year, Month, day, out var date)) continue;
+                var (col, dayNumber) = ordered[i];
+                var date = MapColumnToDate(from, i, dayNumber);
                 ins!.TryGetValue(col, out var tin);
                 outs!.TryGetValue(col, out var tout);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
@@ -219,7 +221,7 @@ public static partial class AttendanceParser
     private static List<AttendanceRecord> ParseMonthlyRows(
         List<List<List<string>>> tables, List<string> header, List<int> dayColumns, string html)
     {
-        (int Year, int Month) = MonthOf(html);
+        var from = StartDateOf(html);
         int ixNo = FindIndex(header, LabelNo);
         int ixId = FindIndex(header, LabelPersonId);
         int ixName = FindIndex(header, LabelName);
@@ -259,10 +261,11 @@ public static partial class AttendanceParser
             string id = parts[1], name = parts[2];
             var ins = metrics.GetValueOrDefault(LabelCheckIn) ?? new Dictionary<int, string>();
             var outs = metrics.GetValueOrDefault(LabelCheckOut) ?? new Dictionary<int, string>();
-            foreach (var col in dayColumns)
+            for (var i = 0; i < dayColumns.Count; i++)
             {
-                var day = int.Parse(Cell(header, col));
-                if (!TryMakeDate(Year, Month, day, out var date)) continue;
+                var col = dayColumns[i];
+                if (!int.TryParse(Cell(header, col), out var dayNumber)) continue;
+                var date = MapColumnToDate(from, i, dayNumber);
                 ins.TryGetValue(col, out var tin);
                 outs.TryGetValue(col, out var tout);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
@@ -307,7 +310,8 @@ public static partial class AttendanceParser
             foreach (var td in tr.SelectNodes("./td|./th") ?? new HtmlNodeCollection(tr))
             {
                 while (row.ContainsKey(column)) column++;
-                var text = System.Net.WebUtility.HtmlDecode(td.InnerText).Trim();
+                // \u00A0 (from &nbsp;) would otherwise survive Trim() and break label matching
+                var text = System.Net.WebUtility.HtmlDecode(td.InnerText).Replace('\u00A0', ' ').Trim();
                 var colspan = SpanOf(td, "colspan");
                 var rowspan = SpanOf(td, "rowspan");
                 for (var k = 0; k < colspan; k++, column++)
@@ -342,21 +346,45 @@ public static partial class AttendanceParser
         value = value?.Trim();
         if (string.IsNullOrEmpty(value) || value == "-") return null;
         if (Regex.IsMatch(value, @"^\d{1,2}:\d{2}:\d{2}$")) value = value[..value.LastIndexOf(':')];
-        return Regex.IsMatch(value, @"^\d{1,2}:\d{2}$") ? value : null;
+        if (!Regex.IsMatch(value, @"^\d{1,2}:\d{2}$")) return null;
+
+        var hour = int.Parse(value[..value.IndexOf(':')], CultureInfo.InvariantCulture);
+        var minute = int.Parse(value[(value.IndexOf(':') + 1)..], CultureInfo.InvariantCulture);
+        if (hour > 23 || minute > 59) return null; // "24:00" or "06:99" are not real punches
+        return $"{hour:00}:{minute:00}";
     }
 
-    private static (int Year, int Month) MonthOf(string html)
+    /// <summary>
+    /// Finds the report's start date ("From: dd-MM-yyyy ...") in the document.
+    /// Every content date in monthly exports is derived relative to this date.
+    /// </summary>
+    private static DateOnly StartDateOf(string html)
     {
-        var match = Regex.Match(html, @"\b(\d{2})-(\d{2})-(\d{4})\b");
-        if (match.Success)
+        var match = Regex.Match(html, @"\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b");
+        if (match.Success
+            && TryMakeDate(int.Parse(match.Groups[3].Value), int.Parse(match.Groups[2].Value), int.Parse(match.Groups[1].Value), out var from))
         {
-            return (int.Parse(match.Groups[3].Value), int.Parse(match.Groups[2].Value));
+            return from;
         }
         throw new InvalidDataException("Could not find a From/To date in the report to determine the month.");
     }
 
-    private static bool TryParseDate(string value, out DateOnly date) =>
-        DateOnly.TryParseExact(value, TemplateSpec.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+    private static readonly string[] DateFormats =
+    {
+        "dd-MM-yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "dd.MM.yyyy", "dd-MM-yy",
+    };
+
+    private static bool TryParseDate(string value, out DateOnly date)
+    {
+        value = value.Trim();
+        if (DateOnly.TryParseExact(value, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+        {
+            return true;
+        }
+        // tolerate timestamps like "06-10-2026 00:00"
+        var datePart = value.Split(' ', 'T')[0];
+        return DateOnly.TryParseExact(datePart, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+    }
 
     private static bool TryMakeDate(int year, int month, int day, out DateOnly date)
     {
@@ -367,5 +395,26 @@ public static partial class AttendanceParser
         }
         date = default;
         return false;
+    }
+
+    /// <summary>
+    /// Maps the n-th day column of a monthly report to a calendar date.
+    /// Day numbers are trusted when they agree with the running date sequence starting at the
+    /// report's From date (calendar months, partial months); columns that break the sequence
+    /// fall back to their day number within the From month (rare skipped-day exports); anything
+    /// else continues the sequence, which keeps ranges that cross into a next month correct.
+    /// </summary>
+    private static DateOnly MapColumnToDate(DateOnly from, int index, int? dayNumber)
+    {
+        var sequential = from.AddDays(index);
+        if (dayNumber.HasValue && dayNumber.Value == sequential.Day)
+        {
+            return sequential;
+        }
+        if (dayNumber.HasValue && TryMakeDate(from.Year, from.Month, dayNumber.Value, out var byDayNumber))
+        {
+            return byDayNumber;
+        }
+        return sequential;
     }
 }

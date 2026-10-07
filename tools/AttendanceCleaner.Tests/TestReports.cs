@@ -131,4 +131,71 @@ public static class TestReports
     // --- monthly blocks without any From/To date in the document ---
 
     public static string MonthlyBlocksWithoutDates() => MonthlyBlocks().Replace("From: 01-09-2026 00:00 To: 30-09-2026 23:59", "September report");
+
+    // --- parameterised builders for content-variation tests ---
+
+    public readonly record struct DailyRow(string No, string Id, string Name, string Date, string? In, string? Out);
+
+    public static string DailyFlexible(params DailyRow[] rows)
+    {
+        var sb = new StringBuilder();
+        sb.Append("""
+            <html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><title>Daily Report</title></head><body>
+            <table><tr><td colspan="20,">Attendance Daily Report</td></tr>
+            <tr><td>No.</td><td>Person ID</td><td>Name</td><td>Department</td><td>Position</td><td>Gender</td>
+            <td>Date</td><td>Week</td><td>Timetable</td><td>Check-in</td><td>Check-out</td><td>Work</td>
+            <td>OT</td><td>Attended</td><td>Late</td><td>Early</td><td>Absent</td><td>Leave</td><td>Status</td><td>Records</td></tr></table>
+            <table>
+            """);
+        foreach (var r in rows)
+        {
+            sb.Append($"""
+                <tr><td>{r.No}</td><td>{r.Id}</td><td>{r.Name}</td><td>DAKSHINAK</td><td>-</td><td>Male</td><td>{r.Date}</td><td>Tue.</td><td>General</td>
+                <td>{r.In ?? "-"}</td><td>{r.Out ?? "-"}</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>P-#</td><td>-</td></tr>
+                """);
+        }
+        sb.Append("</table><table><tr><td>Note: LV = Leave</td></tr></table></body></html>");
+        return sb.ToString();
+    }
+
+    public readonly record struct BlockEmployee(string Id, string Name, int[] Days, string?[] In, string?[] Out);
+
+    public static string MonthlyBlocksFlexible(
+        string fromDateText,
+        int[] days,
+        BlockEmployee[] employees,
+        bool lowercaseLabels = false)
+    {
+        string L(string s) => lowercaseLabels ? s.ToLowerInvariant() : s;
+        var dayCells = string.Concat(days.Select(d => $"<td>{d}</td>"));
+
+        string Cells(IEnumerable<string?> values) => string.Concat(values.Select(v => $"<td>{v ?? "-"}</td>"));
+
+        var sb = new StringBuilder();
+        sb.Append("<html xmlns:x=\"urn:schemas-microsoft-com:office:excel\"><head><title>Attendance Monthly Report</title></head><body><table>");
+        sb.Append("<tr><td colspan=32>Attendance Monthly Report</td></tr>");
+        sb.Append($"<tr><td colspan=32>From: {fromDateText} To: {fromDateText}</td></tr>");
+        sb.Append("</table><table>");
+
+        for (var e = 0; e < employees.Length; e++)
+        {
+            var emp = employees[e];
+            if (e == 0)
+            {
+                sb.Append($"<tr><td>{L("Person ID")}</td><td>{emp.Id}</td><td>{L("Employee Name")}</td><td>{emp.Name}</td></tr>");
+            }
+            else
+            {
+                // mirror the real export: identity row of subsequent employees has no opening <tr>
+                sb.Append($"</tr>\n<TD><b>{L("Person ID")}</b></TD><TD><b>{emp.Id}</b></TD><TD><b>{L("Employee Name")}</b></TD><TD><b>{emp.Name}</b></TD>");
+            }
+
+            sb.Append($"<tr><td>{L("Date")}</td>{dayCells}</tr>");
+            sb.Append($"<tr><td>{L("Check-in1")}</td>{Cells(emp.In)}</tr>");
+            sb.Append($"<tr><td>{L("Check-out1")}</td>{Cells(emp.Out)}</tr>");
+            sb.Append($"<tr><td>{L("Status")}</td>{Cells(Enumerable.Repeat("A-#", days.Length))}</tr>");
+        }
+        sb.Append("</table><table><tr><td>Note: A = Absent</td></tr></table></body></html>");
+        return sb.ToString();
+    }
 }
