@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using AttendanceCleaner.Core;
 
 namespace AttendanceCleaner;
@@ -64,9 +65,14 @@ public partial class MainPage : ContentPage
             {
                 string html;
                 using (var stream = await _selectedFile.OpenReadAsync())
-                using (var reader = new StreamReader(stream))
+                using (var buffered = new MemoryStream())
                 {
-                    html = await reader.ReadToEndAsync();
+                    await stream.CopyToAsync(buffered);
+                    var bytes = buffered.ToArray();
+
+                    AttendanceParser.ValidateInputIsNotWorkbook(bytes.AsSpan(0, Math.Min(8, bytes.Length)));
+
+                    html = Encoding.UTF8.GetString(bytes);
                 }
                 if (!html.Contains('<') || !html.Contains("table", StringComparison.OrdinalIgnoreCase))
                 {

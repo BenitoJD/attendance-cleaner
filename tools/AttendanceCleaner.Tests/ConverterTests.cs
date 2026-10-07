@@ -191,6 +191,32 @@ public class ParserErrorTests
         var ex = Assert.Throws<InvalidDataException>(() => AttendanceParser.Parse(TestReports.MonthlyBlocksWithoutDates()));
         Assert.Contains("From/To", ex.Message);
     }
+
+    [Fact]
+    public void Real_xlsx_workbooks_are_rejected_with_the_template_hint()
+    {
+        // "PK\x03\x04" — a real .xlsx (e.g. the output template) picked as input by mistake
+        var ex = Assert.Throws<InvalidDataException>(
+            () => AttendanceParser.ValidateInputIsNotWorkbook(new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x00 }));
+        Assert.Contains("OUTPUT", ex.Message);
+        Assert.Contains("attendance software", ex.Message);
+    }
+
+    [Fact]
+    public void Old_binary_xls_workbooks_are_rejected_with_the_reexport_hint()
+    {
+        // OLE2 compound file signature
+        var ex = Assert.Throws<InvalidDataException>(
+            () => AttendanceParser.ValidateInputIsNotWorkbook(new byte[] { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1 }));
+        Assert.Contains("binary Excel", ex.Message);
+    }
+
+    [Fact]
+    public void Html_reports_pass_the_workbook_check()
+    {
+        AttendanceParser.ValidateInputIsNotWorkbook("<html>"u8);
+        AttendanceParser.ValidateInputIsNotWorkbook(""u8);
+    }
 }
 
 public class TemplateWriterRowTests

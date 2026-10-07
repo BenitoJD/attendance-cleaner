@@ -39,6 +39,27 @@ public static partial class AttendanceParser
         return Parse(html);
     }
 
+    /// <summary>
+    /// Recognises real Excel workbooks by their file signature and explains the mistake —
+    /// people often pick the output template or an already-converted file as input.
+    /// The software's report export is HTML inside a .xls name, never a real workbook.
+    /// </summary>
+    public static void ValidateInputIsNotWorkbook(ReadOnlySpan<byte> leadingBytes)
+    {
+        if (leadingBytes is [0x50, 0x4B, ..]) // "PK" — zip container: real .xlsx
+        {
+            throw new InvalidDataException(
+                "This is an Excel workbook (.xlsx) — probably the template or an already-converted file, which is the app's OUTPUT. " +
+                "Please choose the .xls report downloaded from the attendance software.");
+        }
+        if (leadingBytes is [0xD0, 0xCF, 0x11, 0xE0, ..]) // OLE2 container: old binary .xls
+        {
+            throw new InvalidDataException(
+                "This is a binary Excel (.xls) workbook, not the attendance software's report export. " +
+                "Please export the report from the software again and choose that downloaded file.");
+        }
+    }
+
     public static ParsedReport Parse(string html)
     {
         if (!html.Contains("</html", StringComparison.OrdinalIgnoreCase)
