@@ -169,6 +169,8 @@ public partial class MainPage : ContentPage
         ConvertBtn.IsEnabled = false;
     }
 
+    private Grid? _headerRow;
+
     /// <summary>Renders the header from the template spec and feeds the rows to the
     /// virtualised list — nothing about the column layout is written in UI code.</summary>
     private void BuildTable(IReadOnlyList<TemplateRow> rows)
@@ -176,9 +178,12 @@ public partial class MainPage : ContentPage
         var widths = TemplateSpec.PreviewColumnWidths;
         TableGrid.WidthRequest = widths.Sum() + 2;
 
-        var header = BuildTableRow(TemplateSpec.Headers, header: true);
-        Grid.SetRow(header, 0);
-        TableGrid.Add(header);
+        if (_headerRow is null)
+        {
+            _headerRow = BuildTableRow(TemplateSpec.Headers, header: true);
+            Grid.SetRow(_headerRow, 0);
+            TableGrid.Add(_headerRow);
+        }
 
         ItemsView.ItemsSource = rows;
     }
