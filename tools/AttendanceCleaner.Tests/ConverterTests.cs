@@ -1,3 +1,4 @@
+using System.Globalization;
 using AttendanceCleaner.Core;
 using ClosedXML.Excel;
 using Xunit;
@@ -352,6 +353,17 @@ public class TemplateWriterExcelTests : IDisposable
         Assert.Equal(
             new[] { "Sl.No", "ID No", "Name", "Gender", "Date", "Day", "In punch", "Out punch", "Total hours", "Remarks" },
             TemplateSpec.Headers);
+    }
+
+    [Fact]
+    public void Suggested_file_names_are_clean_and_professional()
+    {
+        // these are only suggestions - the user renames freely in the save dialog -
+        // but the default itself must look right: no technical suffixes
+        var daily = string.Format(CultureInfo.InvariantCulture, TemplateSpec.DailyFileName, new DateOnly(2026, 10, 6));
+        var monthly = string.Format(CultureInfo.InvariantCulture, TemplateSpec.MonthlyFileName, new DateOnly(2026, 9, 1));
+        Assert.Equal("Attendance_06-10-2026.xlsx", daily);
+        Assert.Equal("Attendance_September 2026.xlsx", monthly);
     }
 
     [Fact]

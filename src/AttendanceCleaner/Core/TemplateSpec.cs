@@ -47,8 +47,8 @@ public static class TemplateSpec
     /// <summary>Header indexes shown left-aligned; the rest are centred.</summary>
     public static readonly int[] PreviewLeftAlignedColumns = { 2, 9 };
 
-    // --- output file naming ---
+    // --- output file naming (suggested to the user; they can rename in the save dialog) ---
 
-    public const string DailyFileName = "Attendance_{0:dd-MM-yyyy}_Template.xlsx";
-    public const string MonthlyFileName = "Attendance_{0:MMMM yyyy}_Template.xlsx";
+    public const string DailyFileName = "Attendance_{0:dd-MM-yyyy}.xlsx";
+    public const string MonthlyFileName = "Attendance_{0:MMMM yyyy}.xlsx";
 }
