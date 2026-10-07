@@ -13,10 +13,18 @@ if (args.Length < 1)
 var input = args[0];
 var output = args.Length > 1 ? args[1] : Path.ChangeExtension(input, ".converted.xlsx");
 
-var report = AttendanceParser.ParseFile(input);
-Console.WriteLine($"Detected format: {report.Format}");
-Console.WriteLine($"Records: {report.Records.Count} across {report.Records.Select(r => r.Date).Distinct().Count()} date(s)");
+try
+{
+    var report = AttendanceParser.ParseFile(input);
+    Console.WriteLine($"Detected format: {report.Format}");
+    Console.WriteLine($"Records: {report.Records.Count} across {report.Records.Select(r => r.Date).Distinct().Count()} date(s)");
 
-TemplateWriter.WriteToFile(report.Records, output);
-Console.WriteLine($"Wrote {output}");
-return 0;
+    TemplateWriter.WriteToFile(report.Records, output);
+    Console.WriteLine($"Wrote {output}");
+    return 0;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"Error: {ex.Message}");
+    return 1;
+}
