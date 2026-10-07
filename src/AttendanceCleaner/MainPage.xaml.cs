@@ -135,26 +135,24 @@ public partial class MainPage : ContentPage
         ConvertBtn.IsEnabled = false;
     }
 
-    /// <summary>Renders the header and every row from the template spec — nothing about the
-    /// column layout is written in UI code.</summary>
+    /// <summary>Renders the header from the template spec and feeds the rows to the
+    /// virtualised list — nothing about the column layout is written in UI code.</summary>
     private void BuildTable(IReadOnlyList<TemplateRow> rows)
     {
         var widths = TemplateSpec.PreviewColumnWidths;
-        TableLayout.WidthRequest = widths.Sum() + 2;
+        TableGrid.WidthRequest = widths.Sum() + 2;
 
-        TableLayout.Add(BuildTableRow(TemplateSpec.Headers, header: true));
-        foreach (var row in rows)
-        {
-            TableLayout.Add(BuildTableRow(row.Cells, header: false));
-        }
+        var header = BuildTableRow(TemplateSpec.Headers, header: true);
+        Grid.SetRow(header, 0);
+        TableGrid.Add(header);
+
+        ItemsView.ItemsSource = rows;
     }
 
     private static Grid BuildTableRow(IReadOnlyList<string> cells, bool header)
     {
         var widths = TemplateSpec.PreviewColumnWidths;
         var grid = new Grid { BackgroundColor = header ? Colors.LightGray : Colors.White };
-        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        grid.RowDefinitions.Add(new RowDefinition(1));
 
         for (var c = 0; c < widths.Length; c++)
         {
@@ -174,12 +172,6 @@ public partial class MainPage : ContentPage
             Grid.SetColumn(label, c);
             grid.Add(label);
         }
-
-        var separator = new BoxView { Color = Colors.LightGray, HeightRequest = 1 };
-        Grid.SetRow(separator, 1);
-        Grid.SetColumn(separator, 0);
-        Grid.SetColumnSpan(separator, widths.Length);
-        grid.Add(separator);
         return grid;
     }
 }

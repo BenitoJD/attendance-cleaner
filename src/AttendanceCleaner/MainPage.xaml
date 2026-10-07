@@ -1,17 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:core="clr-namespace:AttendanceCleaner.Core"
              x:Class="AttendanceCleaner.MainPage"
              Title="Attendance Cleaner">
 
     <Grid RowDefinitions="Auto,*">
 
-        <!-- convert section -->
-        <VerticalStackLayout
-            x:Name="ConvertSection"
-            VerticalOptions="Center"
-            Padding="40"
-            Spacing="20">
+        <!-- convert section (scrollable so portrait and landscape both fit) -->
+        <ScrollView x:Name="ConvertSection" Grid.Row="0">
+            <VerticalStackLayout
+                VerticalOptions="Center"
+                Padding="40"
+                Spacing="20">
 
             <Label
                 Text="Attendance Cleaner"
@@ -49,7 +50,8 @@
                 Text=""
                 FontSize="13"
                 HorizontalTextAlignment="Center" />
-        </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
 
         <!-- results section: the converted rows, shown like the Excel sheet -->
         <Grid
@@ -73,9 +75,31 @@
                 Clicked="OnConvertAnotherClicked" />
 
             <ScrollView Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
-                <ScrollView x:Name="TableVerticalScroll">
-                    <StackLayout x:Name="TableLayout" Spacing="0" />
-                </ScrollView>
+                <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
+
+                    <!-- virtualised list: only the visible rows are laid out, so rotation stays smooth.
+                         The header row is generated from TemplateSpec in code-behind. -->
+                    <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="32" CachingStrategy="RecycleElement" SeparatorVisibility="None">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="core:TemplateRow">
+                                <ViewCell>
+                                    <Grid ColumnDefinitions="45,55,170,55,90,45,65,65,70,85" BackgroundColor="White">
+                                        <Label Text="{Binding SlNo}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="1" Text="{Binding IdNo}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="2" Text="{Binding Name}" FontSize="12" Padding="8,7" LineBreakMode="TailTruncation" />
+                                        <Label Grid.Column="3" Text="{Binding Gender}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="4" Text="{Binding DateText}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="5" Text="{Binding Day}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="6" Text="{Binding InPunch}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="7" Text="{Binding OutPunch}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="8" Text="{Binding TotalHours}" FontSize="12" Padding="4,7" HorizontalTextAlignment="Center" />
+                                        <Label Grid.Column="9" Text="{Binding Remark}" FontSize="12" Padding="4,7" />
+                                    </Grid>
+                                </ViewCell>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
             </ScrollView>
         </Grid>
 
