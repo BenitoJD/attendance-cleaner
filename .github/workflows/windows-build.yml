@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'tools/installer/**'
       - '.github/workflows/windows-build.yml'
 
 jobs:
@@ -44,9 +45,10 @@ jobs:
           -p:WindowsPackageType=None
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
+          -o publish-x64
 
       - name: Zip win-x64 publish output
-        run: Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
+        run: Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
 
       - uses: actions/upload-artifact@v4
         with:
@@ -64,11 +66,33 @@ jobs:
           -p:WindowsPackageType=None
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
+          -o publish-x86
 
       - name: Zip win-x86 publish output
-        run: Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+        run: Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
 
       - uses: actions/upload-artifact@v4
         with:
           name: AttendanceCleaner-win-x86
           path: AttendanceCleaner-win-x86.zip
+
+      - name: Install NSIS
+        run: choco install nsis --version=3.13 --yes --no-progress
+
+      - name: Build per-user setup installers
+        shell: pwsh
+        run: pwsh -File tools/installer/Build-Installers.ps1 -AppVersion 0.0.0
+
+      - name: Test install, launch, and uninstall on Windows
+        shell: pwsh
+        run: pwsh -File tools/installer/Test-Installers.ps1 -AppVersion 0.0.0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AttendanceCleaner-Setup-x64
+          path: build-artifacts/AttendanceCleaner-Setup-x64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AttendanceCleaner-Setup-x86
+          path: build-artifacts/AttendanceCleaner-Setup-x86.exe

@@ -45,6 +45,9 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui
 
+      - name: Install NSIS
+        run: choco install nsis --version=3.13 --yes --no-progress
+
       # folder build (RECOMMENDED): classic layout with every runtime DLL beside the exe
       - name: Publish win-x64 (folder)
         run: >
@@ -103,6 +106,45 @@ jobs:
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
 
+      - name: Build setup installers
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ inputs.version }}" }
+          $version = $tag.TrimStart('v')
+          pwsh -File tools/installer/Build-Installers.ps1 -AppVersion $version
+
+      - name: Sign setup installer x64
+        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: build-artifacts
+          files-folder-filter: AttendanceCleaner-Setup-x64.exe
+          file-digest: sha256
+          timestamp-digest: sha256
+          timestamp-server: http://timestamp.acs.microsoft.com
+
+      - name: Sign setup installer x86
+        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: build-artifacts
+          files-folder-filter: AttendanceCleaner-Setup-x86.exe
+          file-digest: sha256
+          timestamp-digest: sha256
+          timestamp-server: http://timestamp.acs.microsoft.com
+
       - name: Verify the folder build is complete
         shell: pwsh
         run: |
@@ -148,6 +190,13 @@ jobs:
           Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
           Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
 
+      - name: Test setup install, launch, and uninstall
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ inputs.version }}" }
+          $version = $tag.TrimStart('v')
+          pwsh -File tools/installer/Test-Installers.ps1 -AppVersion $version
+
       - name: Create GitHub release
         shell: pwsh
         env:
@@ -157,9 +206,11 @@ jobs:
           $notes = @"
           Attendance Cleaner $tag
 
-          Download the ZIP for your Windows architecture, extract the whole folder, then run AttendanceCleaner.exe from inside it.
-          Keep the other files beside AttendanceCleaner.exe; they contain the Windows and .NET runtime dependencies.
+          Recommended: download the setup EXE for your Windows architecture and run it. It installs Attendance Cleaner for the current Windows user, creates a Start menu shortcut, and adds an uninstaller. No separate .NET installation is required.
+          ZIP files remain available as portable copies; extract the complete folder and run AttendanceCleaner.exe from inside it.
+          - AttendanceCleaner-Setup-x64.exe - recommended for 64-bit Windows 10/11
+          - AttendanceCleaner-Setup-x86.exe - 32-bit Windows installer
           - AttendanceCleaner-win-x64.zip - 64-bit Windows 10/11 (almost every modern PC)
           - AttendanceCleaner-win-x86.zip - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-Setup-x64.exe AttendanceCleaner-Setup-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip

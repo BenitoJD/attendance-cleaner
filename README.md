@@ -76,12 +76,13 @@ dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.x
 
 ## Downloads
 
-**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — download the ZIP for your Windows architecture, extract the whole folder, then run `AttendanceCleaner.exe` from inside it. Keep the other files beside the EXE; they contain the app's runtime dependencies.
+**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — for normal use, download and run the setup EXE for your Windows architecture. It installs Attendance Cleaner for the current Windows user, adds a Start menu shortcut, and registers an uninstaller; it does not require a separate .NET installation.
 
-- `AttendanceCleaner-win-x64.zip` — 64-bit Windows 10 (1809+) / Windows 11 (almost every modern PC)
-- `AttendanceCleaner-win-x86.zip` — 32-bit Windows 10 (1809+); also runs on 64-bit Windows, so it's the safe pick when unsure
+- `AttendanceCleaner-Setup-x64.exe` — recommended for 64-bit Windows 10 (1809+) / Windows 11
+- `AttendanceCleaner-Setup-x86.exe` — for 32-bit Windows 10 (1809+)
+- `AttendanceCleaner-win-x64.zip` / `AttendanceCleaner-win-x86.zip` — portable alternatives; extract the entire folder and run `AttendanceCleaner.exe` from inside it
 
-To publish a new version: tag a commit (`git tag v1.0.1 && git push --tags`) or run the `release` workflow from the Actions tab — it runs the tests, builds both installers, and creates the Release automatically.
+The release workflow runs the tests, builds both setup installers and portable ZIPs, then installs, launches, and uninstalls each setup on a Windows runner before creating a Release.
 
 ## Layout
 
