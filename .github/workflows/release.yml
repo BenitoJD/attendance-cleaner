@@ -85,7 +85,7 @@ jobs:
           code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
           files-folder: publish-x64
-          files-folder-filter: AttendanceCleaner.exe
+          files-folder-filter: AttendanceReportStudio.exe
           file-digest: sha256
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
@@ -101,7 +101,7 @@ jobs:
           code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
           files-folder: publish-x86
-          files-folder-filter: AttendanceCleaner.exe
+          files-folder-filter: AttendanceReportStudio.exe
           file-digest: sha256
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
@@ -124,7 +124,7 @@ jobs:
           code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
           files-folder: build-artifacts
-          files-folder-filter: AttendanceCleaner-Setup-x64.exe
+          files-folder-filter: AttendanceReportStudio-Setup-x64.exe
           file-digest: sha256
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
@@ -140,7 +140,7 @@ jobs:
           code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
           files-folder: build-artifacts
-          files-folder-filter: AttendanceCleaner-Setup-x86.exe
+          files-folder-filter: AttendanceReportStudio-Setup-x86.exe
           file-digest: sha256
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
@@ -149,7 +149,7 @@ jobs:
         shell: pwsh
         run: |
           $runtime = Get-ChildItem 'publish-x64' -Filter 'Microsoft.WindowsAppRuntime*.dll' -ErrorAction SilentlyContinue
-          $exe = Get-Item 'publish-x64/AttendanceCleaner.exe'
+          $exe = Get-Item 'publish-x64/AttendanceReportStudio.exe'
           Write-Host "x64 folder: $((Get-ChildItem 'publish-x64').Count) files, exe is $([math]::Round($exe.Length/1KB)) KB, WinAppSDK runtime DLLs: $($runtime.Count)"
           if ($runtime.Count -eq 0) { throw 'Folder build is missing the Windows App SDK runtime DLLs - it would not start on a clean PC.' }
           if ($exe.Length -gt 10MB) { throw 'Folder build exe is unexpectedly large - the single-file output leaked into it.' }
@@ -157,7 +157,7 @@ jobs:
       - name: Launch test folder build x64
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath 'publish-x64/AttendanceCleaner.exe' -PassThru
+          $p = Start-Process -FilePath 'publish-x64/AttendanceReportStudio.exe' -PassThru
           $ok = $false
           foreach ($i in 1..30) {
             Start-Sleep -Seconds 1
@@ -172,7 +172,7 @@ jobs:
       - name: Launch test folder build x86
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath 'publish-x86/AttendanceCleaner.exe' -PassThru
+          $p = Start-Process -FilePath 'publish-x86/AttendanceReportStudio.exe' -PassThru
           $ok = $false
           foreach ($i in 1..30) {
             Start-Sleep -Seconds 1
@@ -187,8 +187,8 @@ jobs:
       - name: Zip the folder builds
         shell: pwsh
         run: |
-          Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
-          Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+          Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceReportStudio-win-x64.zip'
+          Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceReportStudio-win-x86.zip'
 
       - name: Test setup install, launch, and uninstall
         shell: pwsh
@@ -204,13 +204,13 @@ jobs:
         run: |
           $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "${{ inputs.version }}" }
           $notes = @"
-          Attendance Cleaner $tag
+          Attendance Report Studio $tag
 
-          Recommended: download the setup EXE for your Windows architecture and run it. It installs Attendance Cleaner for the current Windows user, creates a Start menu shortcut, and adds an uninstaller. No separate .NET installation is required.
-          ZIP files remain available as portable copies; extract the complete folder and run AttendanceCleaner.exe from inside it.
-          - AttendanceCleaner-Setup-x64.exe - recommended for 64-bit Windows 10/11
-          - AttendanceCleaner-Setup-x86.exe - 32-bit Windows installer
-          - AttendanceCleaner-win-x64.zip - 64-bit Windows 10/11 (almost every modern PC)
-          - AttendanceCleaner-win-x86.zip - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
+          Recommended: download the setup EXE for your Windows architecture and run it. It installs Attendance Report Studio for the current Windows user, creates a Start menu shortcut, and adds an uninstaller. No separate .NET installation is required.
+          ZIP files remain available as portable copies; extract the complete folder and run AttendanceReportStudio.exe from inside it.
+          - AttendanceReportStudio-Setup-x64.exe - recommended for 64-bit Windows 10/11
+          - AttendanceReportStudio-Setup-x86.exe - 32-bit Windows installer
+          - AttendanceReportStudio-win-x64.zip - 64-bit Windows 10/11 (almost every modern PC)
+          - AttendanceReportStudio-win-x86.zip - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-Setup-x64.exe AttendanceCleaner-Setup-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest AttendanceReportStudio-Setup-x64.exe AttendanceReportStudio-Setup-x86.exe AttendanceReportStudio-win-x64.zip AttendanceReportStudio-win-x86.zip

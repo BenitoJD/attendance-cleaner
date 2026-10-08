@@ -27,7 +27,7 @@
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
 
-    <!-- Attendance Cleaner page palette -->
+    <!-- Attendance Report Studio page palette -->
     <Color x:Key="CanvasLight">#F2F5F7</Color>
     <Color x:Key="CanvasDark">#111827</Color>
     <Color x:Key="SurfaceLight">#FFFFFF</Color>

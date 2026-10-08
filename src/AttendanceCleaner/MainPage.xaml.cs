@@ -390,6 +390,7 @@ public partial class MainPage : ContentPage
     private static string GetHolidayCalendarPath()
     {
 #if WINDOWS
+        // Keep the historical folder so existing user-managed holiday calendars survive the rebrand.
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Attendance Cleaner", "holiday-calendar.json");
 #else

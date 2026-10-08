@@ -160,7 +160,7 @@ public static class DashboardPdf
 
                 page.Footer().Row(foot =>
                 {
-                    foot.RelativeItem().Text($"Generated {DateTime.Now:dd-MM-yyyy HH:mm} · Attendance Cleaner")
+                    foot.RelativeItem().Text($"Generated {DateTime.Now:dd-MM-yyyy HH:mm} · Attendance Report Studio")
                         .FontSize(7).FontColor("#9CA3AF");
                     foot.RelativeItem().AlignRight().Text(text =>
                     {

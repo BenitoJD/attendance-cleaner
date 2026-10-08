@@ -48,12 +48,12 @@ jobs:
           -o publish-x64
 
       - name: Zip win-x64 publish output
-        run: Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
+        run: Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceReportStudio-win-x64.zip'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AttendanceCleaner-win-x64
-          path: AttendanceCleaner-win-x64.zip
+          name: AttendanceReportStudio-win-x64
+          path: AttendanceReportStudio-win-x64.zip
 
       # 32-bit (x86) Windows machines get their own self-contained build
       - name: Publish Windows exe (self-contained win-x86, 32-bit)
@@ -69,12 +69,12 @@ jobs:
           -o publish-x86
 
       - name: Zip win-x86 publish output
-        run: Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+        run: Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceReportStudio-win-x86.zip'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AttendanceCleaner-win-x86
-          path: AttendanceCleaner-win-x86.zip
+          name: AttendanceReportStudio-win-x86
+          path: AttendanceReportStudio-win-x86.zip
 
       - name: Install NSIS
         run: choco install nsis --version=3.13 --yes --no-progress
@@ -89,10 +89,10 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AttendanceCleaner-Setup-x64
-          path: build-artifacts/AttendanceCleaner-Setup-x64.exe
+          name: AttendanceReportStudio-Setup-x64
+          path: build-artifacts/AttendanceReportStudio-Setup-x64.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AttendanceCleaner-Setup-x86
-          path: build-artifacts/AttendanceCleaner-Setup-x86.exe
+          name: AttendanceReportStudio-Setup-x86
+          path: build-artifacts/AttendanceReportStudio-Setup-x86.exe

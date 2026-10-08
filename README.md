@@ -1,8 +1,8 @@
-# attendance-cleaner
+# Attendance Report Studio
 
-A .NET MAUI app that converts attendance reports downloaded from the attendance software into a clean Excel template — plus a dashboard with summaries and a PDF report.
+A .NET MAUI app that turns raw attendance exports into clear daily and monthly Excel reports, with summaries and a PDF dashboard.
 
-**Flow:** open the app → pick the `.xls` file downloaded from the attendance software → Convert & save → choose where to save (Windows shows a Save-as dialog). The cleaned `.xlsx` uses the template format:
+**Flow:** choose a Daily or Monthly template → select the `.xls` export from the attendance software → convert and save the finished `.xlsx`. Monthly reports can use either the Duty/OT or IN/OUT layout and include an editable Holiday Details sheet.
 
 ```
 Sl.No | ID No | Name | Gender | Date | Day | In punch | Out punch | Total hours | Remarks
@@ -29,7 +29,7 @@ The attendance software exports HTML tables with an `.xls` extension. Three layo
 | Monthly report (block style) | one block of rows per employee, days as columns |
 | Monthly Performance report | metric rows per employee, days as columns |
 
-The `Sep Monthly Over View Report` (statuses only, no punch times) is not supported yet.
+The `Sep Monthly Over View Report` contains attendance statuses but no punch times, so it cannot fill the monthly punch templates. Choose a detailed monthly report instead.
 
 ## Removing the Windows warning (code signing)
 
@@ -51,11 +51,12 @@ Requires the .NET SDK with the MAUI workload:
 dotnet workload install maui
 ```
 
-Build/run for Android (works out of the box on this Mac; the SDK lives in `~/.android-sdk`):
+Build/run for Android (requires an installed Android SDK and an emulator or connected device):
 
 ```bash
-dotnet build src/AttendanceCleaner -f net10.0-android -p:AndroidSdkDirectory="$HOME/.android-sdk"
-dotnet build -t:Run -f net10.0-android -p:AndroidSdkDirectory="$HOME/.android-sdk"   # run on emulator/device
+export ANDROID_HOME="/path/to/android-sdk"
+dotnet build src/AttendanceCleaner -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"
+dotnet build -t:Run -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"   # run on emulator/device
 ```
 
 Build for Mac Catalyst / iOS requires full Xcode (not just Command Line Tools) installed on this Mac:
@@ -76,11 +77,11 @@ dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.x
 
 ## Downloads
 
-**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — for normal use, download and run the setup EXE for your Windows architecture. It installs Attendance Cleaner for the current Windows user, adds a Start menu shortcut, and registers an uninstaller; it does not require a separate .NET installation.
+**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — download and run the setup EXE for your Windows architecture. It installs Attendance Report Studio for the current Windows user, adds a Start menu shortcut, and registers an uninstaller; it does not require a separate .NET installation.
 
-- `AttendanceCleaner-Setup-x64.exe` — recommended for 64-bit Windows 10 (1809+) / Windows 11
-- `AttendanceCleaner-Setup-x86.exe` — for 32-bit Windows 10 (1809+)
-- `AttendanceCleaner-win-x64.zip` / `AttendanceCleaner-win-x86.zip` — portable alternatives; extract the entire folder and run `AttendanceCleaner.exe` from inside it
+- `AttendanceReportStudio-Setup-x64.exe` — recommended for 64-bit Windows 10 (1809+) / Windows 11
+- `AttendanceReportStudio-Setup-x86.exe` — for 32-bit Windows 10 (1809+)
+- `AttendanceReportStudio-win-x64.zip` / `AttendanceReportStudio-win-x86.zip` — portable alternatives; extract the entire folder and run `AttendanceReportStudio.exe` from inside it
 
 The release workflow runs the tests, builds both setup installers and portable ZIPs, then installs, launches, and uninstalls each setup on a Windows runner before creating a Release.
 
@@ -90,5 +91,5 @@ The release workflow runs the tests, builds both setup installers and portable Z
 AttendanceCleaner.slnx
 src/AttendanceCleaner/    # the MAUI app (Core/ holds the parser + Excel writer)
 tools/ConverterCli/       # console harness for the core logic (not in the solution)
-tools/AttendanceCleaner.Tests/  # 65-test suite, run in CI
+tools/AttendanceCleaner.Tests/  # test suite, run in CI
 ```

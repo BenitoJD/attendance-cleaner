@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AttendanceCleaner.MainPage"
              BackgroundColor="{AppThemeBinding Light={StaticResource CanvasLight}, Dark={StaticResource CanvasDark}}"
-             Title="Attendance Cleaner">
+             Title="Attendance Report Studio">
 
     <Grid RowDefinitions="Auto,*">
 
@@ -50,9 +50,9 @@
                                HorizontalOptions="Center" VerticalOptions="Center" />
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
-                        <Label Text="Attendance Cleaner" FontSize="23" FontAttributes="Bold"
+                        <Label Text="Attendance Report Studio" FontSize="23" FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Label Text="Turn attendance exports into clean Excel files."
+                        <Label Text="Turn raw attendance exports into clear daily and monthly Excel reports."
                                FontSize="13" LineBreakMode="WordWrap"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>

@@ -10,16 +10,16 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $installerRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $InstallerDirectory))
 $installDirectory = Join-Path $env:LOCALAPPDATA 'Programs\Attendance Cleaner'
-$startMenuShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Attendance Cleaner\Attendance Cleaner.lnk'
+$startMenuShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Attendance Report Studio\Attendance Report Studio.lnk'
 $uninstallSubKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\AttendanceCleaner'
 
 foreach ($architecture in @('x64', 'x86')) {
-    $installer = Join-Path $installerRoot "AttendanceCleaner-Setup-$architecture.exe"
+    $installer = Join-Path $installerRoot "AttendanceReportStudio-Setup-$architecture.exe"
     if (-not (Test-Path $installer)) {
         throw "Missing $architecture installer: $installer"
     }
     if (Test-Path $installDirectory) {
-        throw "A previous Attendance Cleaner install exists at $installDirectory."
+        throw "A previous Attendance Report Studio install exists at $installDirectory."
     }
 
     Write-Host "Installing and smoke-testing the $architecture setup..."
@@ -28,10 +28,10 @@ foreach ($architecture in @('x64', 'x86')) {
         throw "$architecture setup failed with exit code $($setup.ExitCode)."
     }
 
-    $appExecutable = Join-Path $installDirectory 'AttendanceCleaner.exe'
+    $appExecutable = Join-Path $installDirectory 'AttendanceReportStudio.exe'
     $uninstaller = Join-Path $installDirectory 'Uninstall.exe'
     if (-not (Test-Path $appExecutable)) {
-        throw "$architecture setup did not install AttendanceCleaner.exe to $installDirectory."
+        throw "$architecture setup did not install AttendanceReportStudio.exe to $installDirectory."
     }
     if (-not (Test-Path $uninstaller)) {
         throw "$architecture setup did not install its uninstaller."

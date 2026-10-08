@@ -31,7 +31,8 @@
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
 		<!-- Display name -->
-		<ApplicationTitle>Attendance Cleaner</ApplicationTitle>
+		<ApplicationTitle>Attendance Report Studio</ApplicationTitle>
+		<AssemblyName>AttendanceReportStudio</AssemblyName>
 
 		<!-- App Identifier -->
 		<ApplicationId>com.companyname.attendancecleaner</ApplicationId>
