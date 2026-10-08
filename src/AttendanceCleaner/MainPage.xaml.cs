@@ -137,13 +137,9 @@ public partial class MainPage : ContentPage
 
             var present = rows.Count(r => r.Remark == TemplateSpec.RemarkPresent);
             var absent = rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent);
-            var inOnly = rows.Count(r => r.Remark == TemplateSpec.RemarkInPunchOnly);
-
             StatTotal.Text = $"{rows.Count}";
             StatPresent.Text = $"{present}";
             StatAbsent.Text = $"{absent}";
-            StatInOnly.Text = $"{inOnly}";
-            InOnlyCard.IsVisible = inOnly > 0;
             SavedLabel.Text = $"Saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
             _convertedRows = rows;
             BuildTable(rows);
