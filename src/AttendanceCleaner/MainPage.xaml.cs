@@ -6,23 +6,94 @@ namespace AttendanceCleaner;
 
 public partial class MainPage : ContentPage
 {
+    private readonly IndiaTimeClock _indiaTimeClock = new();
     private FileResult? _selectedFile;
     private Dashboard? _dashboard;
     private IReadOnlyList<TemplateRow>? _convertedRows;
     private string _sourceFileName = "";
     private string _outputDirectory = "";
+    private ReportCategory? _selectedCategory;
+    private IDispatcherTimer? _istTimer;
+    private DateTimeOffset _nextIstSyncUtc = DateTimeOffset.MinValue;
+    private bool _istSyncInProgress;
+
+    private enum ReportCategory
+    {
+        Daily,
+        Monthly,
+    }
 
     public MainPage()
     {
         InitializeComponent();
         if (Application.Current is { } app)
             app.RequestedThemeChanged += OnRequestedThemeChanged;
+        UpdateTemplateCardSelection();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+
+        _istTimer ??= CreateIstTimer();
+        _istTimer.Start();
+        UpdateIstClock();
+        if (DateTimeOffset.UtcNow >= _nextIstSyncUtc)
+            _ = SynchronizeIstClockAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        _istTimer?.Stop();
+        base.OnDisappearing();
+    }
+
+    private IDispatcherTimer CreateIstTimer()
+    {
+        var timer = Dispatcher.CreateTimer();
+        timer.Interval = TimeSpan.FromSeconds(1);
+        timer.Tick += OnIstTimerTick;
+        return timer;
+    }
+
+    private void OnIstTimerTick(object? sender, EventArgs e)
+    {
+        UpdateIstClock();
+        if (!_istSyncInProgress && DateTimeOffset.UtcNow >= _nextIstSyncUtc)
+            _ = SynchronizeIstClockAsync();
+    }
+
+    private void UpdateIstClock()
+    {
+        var now = _indiaTimeClock.CurrentTime;
+        IstTimeLabel.Text = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        IstDateLabel.Text = now.ToString("dddd, dd MMMM yyyy", CultureInfo.InvariantCulture);
+    }
+
+    private async Task SynchronizeIstClockAsync()
+    {
+        if (_istSyncInProgress) return;
+
+        _istSyncInProgress = true;
+        _nextIstSyncUtc = DateTimeOffset.UtcNow.AddMinutes(15);
+        IstTimeSourceLabel.Text = "Syncing…";
+        try
+        {
+            var synced = await _indiaTimeClock.SynchronizeAsync();
+            UpdateIstClock();
+            IstTimeSourceLabel.Text = synced ? "Internet synced" : "Device clock · offline";
+        }
+        finally
+        {
+            _istSyncInProgress = false;
+        }
     }
 
     private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
+            UpdateTemplateCardSelection();
             if (_convertedRows is not null)
                 BuildTable(_convertedRows);
             if (_dashboard is not null)
@@ -35,7 +106,52 @@ public partial class MainPage : ContentPage
         });
     }
 
+    private async void OnDailyTemplateClicked(object? sender, EventArgs e) =>
+        await SelectTemplateAsync(ReportCategory.Daily);
+
+    private async void OnMonthlyTemplateClicked(object? sender, EventArgs e) =>
+        await SelectTemplateAsync(ReportCategory.Monthly);
+
+    private async Task SelectTemplateAsync(ReportCategory category)
+    {
+        if (_selectedCategory != category)
+        {
+            _selectedFile = null;
+            FileNameLabel.Text = "";
+            StatusLabel.Text = "";
+            ConvertBtn.IsEnabled = false;
+        }
+
+        _selectedCategory = category;
+        SelectedTemplateLabel.Text = category == ReportCategory.Daily
+            ? "Daily template selected · one-day report"
+            : "Monthly template selected · monthly report";
+        UploadCard.IsVisible = true;
+        UpdateTemplateCardSelection();
+        await PickFileAsync();
+    }
+
+    private void UpdateTemplateCardSelection()
+    {
+        var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        var selectedColor = GetThemeColor(dark ? "SuccessDark" : "SuccessLight");
+        var borderColor = GetThemeColor(dark ? "BorderDark" : "BorderLight");
+
+        DailyTemplateCard.Stroke = new SolidColorBrush(
+            _selectedCategory == ReportCategory.Daily ? selectedColor : borderColor);
+        DailyTemplateCard.StrokeThickness = _selectedCategory == ReportCategory.Daily ? 2 : 1;
+        MonthlyTemplateCard.Stroke = new SolidColorBrush(
+            _selectedCategory == ReportCategory.Monthly ? selectedColor : borderColor);
+        MonthlyTemplateCard.StrokeThickness = _selectedCategory == ReportCategory.Monthly ? 2 : 1;
+    }
+
     private async void OnPickFileClicked(object? sender, EventArgs e)
+    {
+        if (_selectedCategory is null) return;
+        await PickFileAsync();
+    }
+
+    private async Task PickFileAsync()
     {
         var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
         {
@@ -61,6 +177,7 @@ public partial class MainPage : ContentPage
 
             _selectedFile = result;
             FileNameLabel.Text = result.FileName;
+            PickFileBtn.Text = "Choose another report";
             StatusLabel.Text = "";
             ConvertBtn.IsEnabled = true;
         }
@@ -72,10 +189,13 @@ public partial class MainPage : ContentPage
 
     private async void OnConvertClicked(object? sender, EventArgs e)
     {
-        if (_selectedFile is null) return;
+        if (_selectedFile is null || _selectedCategory is null) return;
+        var selectedCategory = _selectedCategory.Value;
 
         ConvertBtn.IsEnabled = false;
         PickFileBtn.IsEnabled = false;
+        DailyTemplateButton.IsEnabled = false;
+        MonthlyTemplateButton.IsEnabled = false;
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
         StatusLabel.Text = "Reading the report...";
@@ -103,16 +223,27 @@ public partial class MainPage : ContentPage
                 }
 
                 var report = AttendanceParser.Parse(html);
+                var isMonthlyReport = report.Format is AttendanceExportFormat.MonthlyBlocks
+                    or AttendanceExportFormat.MonthlyRows;
+                if ((selectedCategory == ReportCategory.Monthly) != isMonthlyReport)
+                {
+                    throw new InvalidDataException(selectedCategory == ReportCategory.Monthly
+                        ? "This is a daily report. Choose the Daily template, or upload a monthly report."
+                        : "This is a monthly report. Choose the Monthly template, or upload a one-day report.");
+                }
+
                 var dates = report.Records.Select(r => r.Date).Distinct().OrderBy(d => d).ToList();
                 if (dates.Count == 0)
                 {
                     throw new InvalidDataException("No attendance rows were found in this file.");
                 }
 
-                // one date -> daily file name; a range -> monthly file name
+                // The selected template category determines the output file name.
                 var fileName = string.Format(
                     CultureInfo.InvariantCulture,
-                    dates.Count > 1 ? TemplateSpec.MonthlyFileName : TemplateSpec.DailyFileName,
+                    selectedCategory == ReportCategory.Monthly
+                        ? TemplateSpec.MonthlyFileName
+                        : TemplateSpec.DailyFileName,
                     dates[0]);
 
                 return (report, dates, fileName);
@@ -163,6 +294,8 @@ public partial class MainPage : ContentPage
             Spinner.IsRunning = false;
             ConvertBtn.IsEnabled = _selectedFile != null;
             PickFileBtn.IsEnabled = true;
+            DailyTemplateButton.IsEnabled = true;
+            MonthlyTemplateButton.IsEnabled = true;
         }
     }
 
@@ -199,6 +332,10 @@ public partial class MainPage : ContentPage
         FileNameLabel.Text = "";
         StatusLabel.Text = "";
         ConvertBtn.IsEnabled = false;
+        UploadCard.IsVisible = false;
+        SelectedTemplateLabel.Text = "";
+        _selectedCategory = null;
+        UpdateTemplateCardSelection();
         _convertedRows = null;
         _dashboard = null;
         ShowTableTab();
