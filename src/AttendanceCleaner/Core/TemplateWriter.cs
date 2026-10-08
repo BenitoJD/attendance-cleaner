@@ -101,6 +101,12 @@ public static class TemplateWriter
             ws.Column(column).Width = width;
         }
 
+        // filter dropdown on every column, covering exactly the header and the data rows
+        if (row > 2)
+        {
+            ws.Range(1, 1, row - 1, TemplateSpec.Headers.Length).SetAutoFilter();
+        }
+
         workbook.SaveAs(output);
     }
 

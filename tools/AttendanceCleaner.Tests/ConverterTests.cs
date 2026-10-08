@@ -409,4 +409,16 @@ public class TemplateWriterExcelTests : IDisposable
         Assert.NotNull(last);
         Assert.Equal(4, last.RowNumber());
     }
+
+    [Fact]
+    public void Every_column_has_a_filter_dropdown_spanning_the_data()
+    {
+        var ws = WriteAndOpenSheet();
+        var filter = ws.AutoFilter;
+        Assert.NotNull(filter);
+        Assert.Equal(TemplateSpec.Headers.Length, filter.Range.ColumnCount());
+        Assert.Equal(4, filter.Range.RowCount()); // header + 3 data rows
+        Assert.Equal(1, filter.Range.RangeAddress.FirstAddress.ColumnNumber);
+        Assert.Equal(1, filter.Range.RangeAddress.FirstAddress.RowNumber);
+    }
 }
