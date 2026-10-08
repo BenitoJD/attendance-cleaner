@@ -181,6 +181,19 @@ public class ParserErrorTests
     }
 
     [Fact]
+    public void Monthly_overview_is_explained_as_a_status_summary_without_punch_times()
+    {
+        var header = new[] { "Department", "Name" }
+            .Concat(Enumerable.Range(1, 30).Select(day => day.ToString(CultureInfo.InvariantCulture)))
+            .Concat(new[] { "Present", "Absent", "Late" });
+        var html = $"<html><body><table><tr>{string.Concat(header.Select(cell => $"<td>{cell}</td>"))}</tr></table></body></html>";
+
+        var ex = Assert.Throws<InvalidDataException>(() => AttendanceParser.Parse(html));
+        Assert.Contains("Monthly Overview summary", ex.Message);
+        Assert.Contains("no check-in/check-out punch times", ex.Message);
+    }
+
+    [Fact]
     public void Empty_input_is_rejected()
     {
         Assert.ThrowsAny<Exception>(() => AttendanceParser.Parse(""));

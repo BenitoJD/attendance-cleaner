@@ -91,6 +91,12 @@ public static partial class AttendanceParser
         {
             return new ParsedReport(AttendanceExportFormat.MonthlyRows, ParseMonthlyRows(tables, monthly.header, monthly.dayColumns, html));
         }
+        if (LooksLikeMonthlyOverview(tables))
+        {
+            throw new InvalidDataException(
+                "This is a Monthly Overview summary. It contains daily attendance marks and totals, but no check-in/check-out punch times. " +
+                "Choose a detailed Monthly report export that includes the Check-in and Check-out columns to fill the monthly templates.");
+        }
 
         throw new InvalidDataException(
             "The file does not look like an attendance export. Expected the software's Daily or Monthly report (.xls).");
@@ -263,6 +269,12 @@ public static partial class AttendanceParser
         }
         return null;
     }
+
+    private static bool LooksLikeMonthlyOverview(List<List<List<string>>> tables) =>
+        tables.SelectMany(t => t).Any(row =>
+            Same(Cell(row, 0), "Department")
+            && Same(Cell(row, 1), LabelName)
+            && row.Count(c => int.TryParse(c, out var day) && day is >= 1 and <= 31) >= 28);
 
     private static List<AttendanceRecord> ParseMonthlyRows(
         List<List<List<string>>> tables, List<string> header, List<int> dayColumns, string html)
