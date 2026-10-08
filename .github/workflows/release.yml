@@ -62,8 +62,8 @@ jobs:
           -p:WindowsAppSDKSelfContained=true
           -o publish-x86
 
-      # single-file build (experimental): one exe; kept as a bonus, not the primary download
-      - name: Publish win-x64 (single file, experimental)
+      # single-file builds: one exe each, everything (including native libs and content) bundled
+      - name: Publish win-x64 (single file)
         run: >
           dotnet publish src/AttendanceCleaner
           -c Release
@@ -78,6 +78,21 @@ jobs:
           -p:IncludeAllContentForSelfExtract=true
           -o publish-sf-x64
 
+      - name: Publish win-x86 (single file)
+        run: >
+          dotnet publish src/AttendanceCleaner
+          -c Release
+          -f net10.0-windows10.0.19041.0
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x86
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -p:WindowsAppSDKSelfContained=true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:IncludeAllContentForSelfExtract=true
+          -o publish-sf-x86
+
       - name: Verify the folder build is complete
         shell: pwsh
         run: |
@@ -87,12 +102,43 @@ jobs:
           if ($runtime.Count -eq 0) { throw 'Folder build is missing the Windows App SDK runtime DLLs - it would not start on a clean PC.' }
           if ($exe.Length -gt 10MB) { throw 'Folder build exe is unexpectedly large - the single-file output leaked into it.' }
 
-      - name: Zip the folder builds
+      - name: Launch test single-file x64 (clean machine proof)
         shell: pwsh
         run: |
+          $p = Start-Process -FilePath 'publish-sf-x64/AttendanceCleaner.exe' -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            $p.Refresh()
+            if ($p.HasExited) { break }
+            if ($p.MainWindowHandle -ne 0) { $ok = $true; break }
+          }
+          Write-Host "x64 single-file: started=$ok window=$($p.MainWindowHandle)"
+          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x64 single-file exe failed to start on a clean Windows machine' }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Launch test single-file x86 (clean machine proof)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath 'publish-sf-x86/AttendanceCleaner.exe' -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            $p.Refresh()
+            if ($p.HasExited) { break }
+            if ($p.MainWindowHandle -ne 0) { $ok = $true; break }
+          }
+          Write-Host "x86 single-file: started=$ok window=$($p.MainWindowHandle)"
+          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x86 single-file exe failed to start on a clean Windows machine' }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
+          Copy-Item 'publish-sf-x86/AttendanceCleaner.exe' 'AttendanceCleaner-x86.exe'
           Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
           Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
-          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
 
       - name: Create GitHub release
         shell: pwsh
@@ -103,12 +149,14 @@ jobs:
           $notes = @"
           Attendance Cleaner $tag
 
-          RECOMMENDED - the zip builds (classic layout, run anywhere):
-          1. Download AttendanceCleaner-win-x64.zip (64-bit) or AttendanceCleaner-win-x86.zip (32-bit)
-          2. Right-click the zip, Extract All
-          3. Open the folder and double-click AttendanceCleaner.exe
-          First launch: if Windows shows a blue SmartScreen warning, click More info, then Run anyway.
+          Share just the exe - each one is a single file with everything inside:
+          - AttendanceCleaner-x64.exe - 64-bit Windows 10/11 (almost every modern PC)
+          - AttendanceCleaner-x86.exe - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
 
-          BONUS - AttendanceCleaner-x64.exe is a single-file build. Try it if you prefer one file; if it does not start, use the zip above.
+          Download one, double-click it. No installation, no dependencies.
+          First launch may take a few extra seconds while it unpacks, and Windows may show a one-time SmartScreen notice (More info, then Run anyway).
+
+          Folder fallbacks for locked-down corporate PCs:
+          - AttendanceCleaner-win-x64.zip / AttendanceCleaner-win-x86.zip
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip AttendanceCleaner-x64.exe
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-x64.exe AttendanceCleaner-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
