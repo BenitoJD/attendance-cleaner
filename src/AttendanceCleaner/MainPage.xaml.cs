@@ -219,7 +219,7 @@ public partial class MainPage : ContentPage
         {
             _holidayEntries = _holidayCalendarStore.LoadOrSeed().ToList();
             RenderHolidayRows();
-            HolidaySaveStatus.Text = $"{_holidayEntries.Count} dates saved on this device.";
+            HolidaySaveStatus.Text = $"{_holidayEntries.Count} holidays saved.";
         }
         catch (Exception ex)
         {
@@ -230,7 +230,12 @@ public partial class MainPage : ContentPage
         MonthlyOptionsPanel.IsVisible = false;
         UploadCard.IsVisible = false;
         HolidayManagerCard.IsVisible = true;
-        AddHolidayButton.Focus();
+        Dispatcher.Dispatch(() =>
+        {
+            foreach (var row in HolidayRowsLayout.Children.OfType<Grid>())
+            foreach (var cell in row.Children.OfType<Border>())
+                cell.Content?.Unfocus();
+        });
     }
 
     private void OnHolidayManagerBackClicked(object? sender, EventArgs e)
@@ -250,79 +255,96 @@ public partial class MainPage : ContentPage
     private void RenderHolidayRows()
     {
         HolidayRowsLayout.Children.Clear();
+        NoHolidayRowsLabel.IsVisible = _holidayEntries.Count == 0;
+
+        var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        var borderColor = GetThemeColor(dark ? "BorderDark" : "BorderLight");
+        var rowIndex = 0;
+
         foreach (var holiday in HolidayCalendarStore.Sort(_holidayEntries))
         {
-            var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
-            var card = new Border
+            var row = new Grid
             {
-                Stroke = new SolidColorBrush(GetThemeColor(dark ? "BorderDark" : "BorderLight")),
-                StrokeThickness = 1,
-                BackgroundColor = GetThemeColor("SurfaceAltLight"),
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
-                Padding = new Thickness(10),
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(112)),
+                    new ColumnDefinition(new GridLength(180)),
+                    new ColumnDefinition(new GridLength(170)),
+                    new ColumnDefinition(new GridLength(62)),
+                },
+                ColumnSpacing = 0,
+                HeightRequest = 48,
             };
-            SetThemeColor(card, Border.BackgroundColorProperty, "SurfaceAltLight", "SurfaceAltDark");
-
-            var layout = new Grid { RowSpacing = 8, ColumnSpacing = 8 };
-            layout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            layout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
             var datePicker = new DatePicker
             {
                 Date = holiday.Date.ToDateTime(TimeOnly.MinValue),
-                Format = "dd MMM yyyy",
+                Format = "dd/MM/yyyy",
+                FontSize = 12,
                 HorizontalOptions = LayoutOptions.Fill,
-                BackgroundColor = GetThemeColor("SurfaceLight"),
+                VerticalOptions = LayoutOptions.Center,
+                BackgroundColor = Colors.Transparent,
             };
             SetThemeColor(datePicker, DatePicker.TextColorProperty, "TextBodyLight", "TextBodyDark");
-            SetThemeColor(datePicker, DatePicker.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
 
             var categoryPicker = new Picker
             {
                 Title = "Category",
-                ItemsSource = HolidayCategories,
-                SelectedItem = holiday.Category,
+                ItemsSource = HolidayCategoryOptions.Select(option => option.Label).ToArray(),
+                SelectedIndex = Array.FindIndex(HolidayCategoryOptions,
+                    option => option.Value.Equals(holiday.Category, StringComparison.OrdinalIgnoreCase)),
+                FontSize = 11,
                 HorizontalOptions = LayoutOptions.Fill,
-                BackgroundColor = GetThemeColor("SurfaceLight"),
+                VerticalOptions = LayoutOptions.Center,
+                BackgroundColor = Colors.Transparent,
             };
             SetThemeColor(categoryPicker, Picker.TextColorProperty, "TextBodyLight", "TextBodyDark");
-            SetThemeColor(categoryPicker, Picker.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
 
             var nameEntry = new Entry
             {
                 Text = holiday.Name,
                 Placeholder = "Holiday name",
+                FontSize = 13,
                 HorizontalOptions = LayoutOptions.Fill,
-                BackgroundColor = GetThemeColor("SurfaceLight"),
+                VerticalOptions = LayoutOptions.Center,
+                BackgroundColor = Colors.Transparent,
             };
             SetThemeColor(nameEntry, Entry.TextColorProperty, "TextBodyLight", "TextBodyDark");
             SetThemeColor(nameEntry, Entry.PlaceholderColorProperty, "TextSecondaryLight", "TextSecondaryDark");
-            SetThemeColor(nameEntry, Entry.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
 
             var removeButton = new Button
             {
-                Text = "Remove",
-                FontSize = 12,
-                Padding = new Thickness(10, 7),
-                CornerRadius = 9,
-                BackgroundColor = GetThemeColor("SurfaceLight"),
+                Text = "Delete",
+                FontSize = 10,
+                Padding = new Thickness(2, 0),
+                CornerRadius = 0,
+                BackgroundColor = Colors.Transparent,
                 TextColor = GetThemeColor("DangerLight"),
-                BorderColor = GetThemeColor("DangerLight"),
-                BorderWidth = 1,
+                HorizontalOptions = LayoutOptions.Fill,
+                VerticalOptions = LayoutOptions.Fill,
             };
-            SetThemeColor(removeButton, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
             SetThemeColor(removeButton, Button.TextColorProperty, "DangerLight", "DangerDark");
-            SetThemeColor(removeButton, Button.BorderColorProperty, "DangerLight", "DangerDark");
+            SemanticProperties.SetDescription(removeButton, $"Delete {holiday.Name}");
 
-            var topRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) }, ColumnSpacing = 8 };
-            topRow.Add(datePicker, 0);
-            topRow.Add(categoryPicker, 1);
-            var bottomRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 8 };
-            bottomRow.Add(nameEntry, 0);
-            bottomRow.Add(removeButton, 1);
-            layout.Add(topRow, 0, 0);
-            layout.Add(bottomRow, 0, 1);
-            card.Content = layout;
+            Border Cell(View content)
+            {
+                var cell = new Border
+                {
+                    Stroke = new SolidColorBrush(borderColor),
+                    StrokeThickness = 0.75,
+                    Padding = new Thickness(4, 2),
+                    Content = content,
+                };
+                SetThemeColor(cell, Border.BackgroundColorProperty,
+                    rowIndex % 2 == 0 ? "SurfaceLight" : "SurfaceAltLight",
+                    rowIndex % 2 == 0 ? "SurfaceDark" : "SurfaceAltDark");
+                return cell;
+            }
+
+            row.Add(Cell(datePicker), 0);
+            row.Add(Cell(nameEntry), 1);
+            row.Add(Cell(categoryPicker), 2);
+            row.Add(Cell(removeButton), 3);
 
             datePicker.DateSelected += (_, args) =>
             {
@@ -331,8 +353,11 @@ public partial class MainPage : ContentPage
             };
             categoryPicker.SelectedIndexChanged += (_, _) =>
             {
-                if (categoryPicker.SelectedItem is string category)
+                if (categoryPicker.SelectedIndex >= 0)
+                {
+                    var category = HolidayCategoryOptions[categoryPicker.SelectedIndex].Value;
                     UpdateHoliday(holiday.Id, entry => entry with { Category = category });
+                }
             };
             nameEntry.TextChanged += (_, args) => UpdateHoliday(holiday.Id, entry => entry with { Name = args.NewTextValue ?? "" });
             removeButton.Clicked += (_, _) =>
@@ -341,7 +366,8 @@ public partial class MainPage : ContentPage
                 SaveHolidayCalendar();
                 RenderHolidayRows();
             };
-            HolidayRowsLayout.Children.Add(card);
+            HolidayRowsLayout.Children.Add(row);
+            rowIndex++;
         }
     }
 
@@ -358,7 +384,7 @@ public partial class MainPage : ContentPage
         try
         {
             _holidayCalendarStore.Save(_holidayEntries);
-            HolidaySaveStatus.Text = $"Saved · {_holidayEntries.Count} holiday details";
+            HolidaySaveStatus.Text = $"Saved · {_holidayEntries.Count} holidays";
         }
         catch (Exception ex)
         {
@@ -376,13 +402,13 @@ public partial class MainPage : ContentPage
 #endif
     }
 
-    private static readonly string[] HolidayCategories =
+    private static readonly (string Label, string Value)[] HolidayCategoryOptions =
     {
-        "Corporate Office",
-        "Tamil Nadu",
-        "Optional · Corporate Office",
-        "Optional · Tamil Nadu",
-        "Working Saturday · Corporate Office",
+        ("Corporate office", "Corporate Office"),
+        ("Tamil Nadu", "Tamil Nadu"),
+        ("Optional · corporate", "Optional · Corporate Office"),
+        ("Optional · Tamil Nadu", "Optional · Tamil Nadu"),
+        ("Working Saturday", "Working Saturday · Corporate Office"),
     };
 
     private void UpdateTemplateCardSelection()

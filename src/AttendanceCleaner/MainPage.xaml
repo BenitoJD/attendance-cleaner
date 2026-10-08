@@ -189,7 +189,7 @@
                                 <VerticalStackLayout Spacing="3">
                                     <Label Text="Holiday details" FontSize="18" FontAttributes="Bold"
                                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                    <Label Text="Edit the 2026 list or add your own dates. Changes save automatically on this device."
+                                    <Label Text="Edit the holiday rows here. Changes save automatically."
                                            FontSize="12" LineBreakMode="WordWrap"
                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                 </VerticalStackLayout>
@@ -204,7 +204,35 @@
                                     TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
                                     FontSize="13" FontAttributes="Bold" CornerRadius="11" Padding="12,9"
                                     Clicked="OnAddHolidayClicked" />
-                            <VerticalStackLayout x:Name="HolidayRowsLayout" Spacing="8" />
+                            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                                <VerticalStackLayout WidthRequest="524" Spacing="0">
+                                    <Grid ColumnDefinitions="112,180,170,62" ColumnSpacing="0" HeightRequest="36">
+                                        <Border Grid.Column="0" Padding="8,4" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}">
+                                            <Label Text="Date" FontSize="12" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="8,4" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}">
+                                            <Label Text="Holiday details" FontSize="12" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                                        </Border>
+                                        <Border Grid.Column="2" Padding="8,4" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}">
+                                            <Label Text="Category" FontSize="12" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                                        </Border>
+                                        <Border Grid.Column="3" Padding="3,4" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}">
+                                            <Label Text="" />
+                                        </Border>
+                                    </Grid>
+                                    <Label x:Name="NoHolidayRowsLabel" Text="No holidays yet. Use Add holiday to create a row."
+                                           IsVisible="False" Margin="0,10,0,10" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <VerticalStackLayout x:Name="HolidayRowsLayout" Spacing="0" />
+                                </VerticalStackLayout>
+                            </ScrollView>
                             <Label x:Name="HolidaySaveStatus" Text="" FontSize="12"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                         </VerticalStackLayout>
