@@ -328,24 +328,6 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                        StrokeShape="RoundRectangle 16" Padding="16,10">
-                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
-                    <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatPresent" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
-                        <Label Text="present" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    </VerticalStackLayout>
-                </Border>
-
-                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                        StrokeShape="RoundRectangle 16" Padding="16,10">
-                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
-                    <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatAbsent" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
-                        <Label Text="absent" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    </VerticalStackLayout>
-                </Border>
-
             </HorizontalStackLayout>
 
             <!-- segmented tabs: Table | Dashboard + save-PDF -->

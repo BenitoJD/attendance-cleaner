@@ -594,16 +594,8 @@ public partial class MainPage : ContentPage
             });
 
             var rows = conversion.Rows;
-            var present = conversion.Summaries is null
-                ? rows.Count(r => r.Remark == TemplateSpec.RemarkPresent)
-                : conversion.Summaries.Sum(summary => summary.PresentDays);
-            var absent = conversion.Summaries is null
-                ? rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent)
-                : conversion.Summaries.Sum(summary => summary.AbsentDays);
             StatTotalLabel.Text = selectedCategory == ReportCategory.Monthly ? "employees" : "rows";
             StatTotal.Text = $"{conversion.Summaries?.Count ?? rows.Count}";
-            StatPresent.Text = $"{present}";
-            StatAbsent.Text = $"{absent}";
             var templateName = selectedCategory == ReportCategory.Monthly
                 ? selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime ? "Duty + OT" : "IN / OUT"
                 : "Daily";
