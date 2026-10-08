@@ -1,14 +1,23 @@
 # attendance-cleaner
 
-A .NET MAUI app that converts attendance reports downloaded from the attendance software into a clean Excel template.
+A .NET MAUI app that converts attendance reports downloaded from the attendance software into a clean Excel template — plus a dashboard with summaries and a PDF report.
 
 **Flow:** open the app → pick the `.xls` file downloaded from the attendance software → Convert & save → choose where to save (Windows shows a Save-as dialog). The cleaned `.xlsx` uses the template format:
 
 ```
-Sl.No | ID No | Name | Genter | Date | Day | In punch | Out punch | Total hours | Remarks
+Sl.No | ID No | Name | Gender | Date | Day | In punch | Out punch | Total hours | Remarks
 ```
 
 Remarks are derived from the punches: both punches → **Present**, check-in only → **In punch only**, none → **Absent**.
+
+## Dashboard
+
+After converting, the results screen has two tabs:
+
+- **Table** — the converted rows, shown like the Excel sheet (columns auto-sized to content).
+- **Dashboard** — derived analytics: employee count, average in/out times, average worked hours, a per-day attendance chart (present vs absent), and a per-employee summary (present/absent/in-only days, personal averages, attendance rate). Everything is computed from the converted data — no schedules or work rules are assumed.
+
+**Save dashboard as PDF** generates a landscape A4 report with all of the above (KPIs, chart, employee table, page numbers) and opens the save dialog — suggested name `Attendance Dashboard <Month Year>.pdf`. PDF export is available in the Windows build.
 
 ## Supported inputs
 
