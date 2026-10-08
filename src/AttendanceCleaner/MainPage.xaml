@@ -13,7 +13,7 @@
                 BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceDark}}"
                 StrokeShape="RoundRectangle 12" Padding="12,6">
             <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" HeightRequest="32">
-                <Label Text="IST" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5"
+                <Label Text="Indian Time" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5"
                        VerticalTextAlignment="Center"
                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                 <Label x:Name="IstTimeLabel" Grid.Column="1" Text="--:--:-- AM" FontSize="18" FontAttributes="Bold"
