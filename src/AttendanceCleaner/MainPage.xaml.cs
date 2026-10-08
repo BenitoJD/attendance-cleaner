@@ -453,15 +453,10 @@ public partial class MainPage : ContentPage
     {
         var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
         {
-            [DevicePlatform.WinUI] = new[] { ".xls", ".xlsx", ".html" },
-            [DevicePlatform.Android] = new[]
-            {
-                "application/vnd.ms-excel",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "text/html",
-            },
-            [DevicePlatform.iOS] = new[] { "com.microsoft.excel.xls", "org.openxmlformats.spreadsheetml.sheet", "public.html" },
-            [DevicePlatform.MacCatalyst] = new[] { "com.microsoft.excel.xls", "org.openxmlformats.spreadsheetml.sheet", "public.html" },
+            [DevicePlatform.WinUI] = new[] { ".xls" },
+            [DevicePlatform.Android] = new[] { "application/vnd.ms-excel" },
+            [DevicePlatform.iOS] = new[] { "com.microsoft.excel.xls" },
+            [DevicePlatform.MacCatalyst] = new[] { "com.microsoft.excel.xls" },
         });
 
         try
@@ -472,6 +467,12 @@ public partial class MainPage : ContentPage
                 FileTypes = fileTypes,
             });
             if (result == null) return;
+
+            if (!string.Equals(Path.GetExtension(result.FileName), ".xls", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusLabel.Text = "Only .xls files are allowed. Choose the attendance report exported from your software.";
+                return;
+            }
 
             _selectedFile = result;
             FileNameLabel.Text = result.FileName;
