@@ -27,6 +27,14 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      # code signing via Azure Trusted Signing. Set these repo secrets and every
+      # release is signed automatically (no SmartScreen / Smart App Control blocks):
+      # AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+      # AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT, AZURE_CERT_PROFILE
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_SIGNING_CONFIGURED: ${{ secrets.AZURE_TENANT_ID != '' && secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_SIGNING_ENDPOINT != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -93,6 +101,61 @@ jobs:
           -p:IncludeAllContentForSelfExtract=true
           -o publish-sf-x86
 
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
+          Copy-Item 'publish-sf-x86/AttendanceCleaner.exe' 'AttendanceCleaner-x86.exe'
+
+      # signing activates only when the Azure Trusted Signing secrets are configured
+      - name: Sign folder exe x64
+        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: publish-x64
+          files-folder-filter: AttendanceCleaner.exe
+          file-digest: sha256
+          timestamp-digest: sha256
+          timestamp-server: http://timestamp.acs.microsoft.com
+
+      - name: Sign folder exe x86
+        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: publish-x86
+          files-folder-filter: AttendanceCleaner.exe
+          file-digest: sha256
+          timestamp-digest: sha256
+          timestamp-server: http://timestamp.acs.microsoft.com
+
+      - name: Sign single-file exes
+        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: .
+          files-folder-filter: AttendanceCleaner-x64.exe,AttendanceCleaner-x86.exe
+          file-digest: sha256
+          timestamp-digest: sha256
+          timestamp-server: http://timestamp.acs.microsoft.com
+
       - name: Verify the folder build is complete
         shell: pwsh
         run: |
@@ -132,11 +195,9 @@ jobs:
           if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x86 single-file exe failed to start on a clean Windows machine' }
           Stop-Process -Id $p.Id -Force
 
-      - name: Stage release files
+      - name: Zip the folder builds
         shell: pwsh
         run: |
-          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
-          Copy-Item 'publish-sf-x86/AttendanceCleaner.exe' 'AttendanceCleaner-x86.exe'
           Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
           Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
 
@@ -154,9 +215,6 @@ jobs:
           - AttendanceCleaner-x86.exe - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
 
           Download one, double-click it. No installation, no dependencies.
-          First launch may take a few extra seconds while it unpacks, and Windows may show a one-time SmartScreen notice (More info, then Run anyway).
-
-          Folder fallbacks for locked-down corporate PCs:
-          - AttendanceCleaner-win-x64.zip / AttendanceCleaner-win-x86.zip
+          First launch may take a few extra seconds while it unpacks.
           "@
           gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-x64.exe AttendanceCleaner-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip

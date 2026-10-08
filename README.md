@@ -31,6 +31,18 @@ The attendance software exports HTML tables with an `.xls` extension. Three layo
 
 The `Sep Monthly Over View Report` (statuses only, no punch times) is not supported yet.
 
+## Removing the Windows warning (code signing)
+
+Windows 11's **Smart App Control** (and SmartScreen on Windows 10) block unsigned apps. The permanent fix is signing the exes with a code signing certificate; there is no app-side trick that avoids it.
+
+This repo is ready for **Azure Trusted Signing** (about 10 USD/month, individual developers accepted). One-time setup:
+
+1. Create an Azure Trusted Signing account and certificate profile (Azure portal, Identity validation required)
+2. Register an Entra ID app with the "Code Signing Developer" role on that account
+3. Add these repository secrets (Settings, Secrets and variables, Actions): `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERT_PROFILE`
+
+Every release after that signs both exes automatically and the warnings disappear. Until then, users see the one-time SmartScreen "Run anyway" prompt, and on machines with Smart App Control fully On an administrator must turn it off for that PC (Settings, Privacy and security, Windows Security, App and browser control).
+
 ## Development
 
 Requires the .NET SDK with the MAUI workload:
