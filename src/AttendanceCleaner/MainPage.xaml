@@ -13,10 +13,10 @@
                 BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                 StrokeShape="RoundRectangle 18" Padding="16,12">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <VerticalStackLayout Spacing="1" VerticalOptions="Center">
+                <VerticalStackLayout Spacing="2" VerticalOptions="Center">
                     <Label Text="INDIA STANDARD TIME" FontSize="10" FontAttributes="Bold" CharacterSpacing="1"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    <Label x:Name="IstTimeLabel" Text="--:--:--" FontSize="28" FontAttributes="Bold"
+                    <Label x:Name="IstTimeLabel" Text="--:--:--" FontSize="30" FontAttributes="Bold"
                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
                     <Label x:Name="IstDateLabel" Text="" FontSize="12"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
@@ -35,42 +35,45 @@
             <VerticalStackLayout
                 VerticalOptions="Center"
                 HorizontalOptions="Center"
-                Padding="24"
-                Spacing="16"
+                Padding="24,26,24,32"
+                Spacing="20"
                 MaximumWidthRequest="600">
 
-                <Border
-                    StrokeThickness="0" BackgroundColor="#059669"
-                    StrokeShape="RoundRectangle 26"
-                    WidthRequest="60" HeightRequest="60"
-                    HorizontalOptions="Center">
-                    <Border.Shadow>
-                        <Shadow Brush="Black" Opacity="0.2" Radius="16" />
-                    </Border.Shadow>
-                    <Label Text="✓" TextColor="White" FontSize="30" FontAttributes="Bold"
-                           HorizontalOptions="Center" VerticalOptions="Center" />
-                </Border>
-
-                <Label Text="Attendance Cleaner"
-                       FontSize="26" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                       HorizontalTextAlignment="Center" />
-
-                <Label Text="Choose a report type and convert its attendance export into a clean Excel file."
-                       FontSize="15" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                       HorizontalTextAlignment="Center" />
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14" HorizontalOptions="Fill">
+                    <Border StrokeThickness="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                            StrokeShape="RoundRectangle 16"
+                            WidthRequest="50" HeightRequest="50" VerticalOptions="Center">
+                        <Label Text="✓"
+                               TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                               FontSize="26" FontAttributes="Bold"
+                               HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                        <Label Text="Attendance Cleaner" FontSize="23" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="Turn attendance exports into clean Excel files."
+                               FontSize="13" LineBreakMode="WordWrap"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                </Grid>
 
                 <VerticalStackLayout Spacing="12">
-                    <Label Text="Choose a template" FontSize="15" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <VerticalStackLayout Spacing="4" Margin="0,4,0,0">
+                        <Label Text="CHOOSE A TEMPLATE" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
+                               TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
+                        <Label Text="Select the report period to continue." FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
 
                     <Border x:Name="DailyTemplateCard"
                             Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
                             BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                            StrokeShape="RoundRectangle 18" Padding="14">
+                            StrokeShape="RoundRectangle 18" Padding="15">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Border WidthRequest="42" HeightRequest="42" StrokeThickness="0"
+                            <Border WidthRequest="44" HeightRequest="44" StrokeThickness="0"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
-                                    StrokeShape="RoundRectangle 13" VerticalOptions="Center">
+                                    StrokeShape="RoundRectangle 14" VerticalOptions="Center">
                                 <Label Text="D" FontSize="19" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
@@ -78,12 +81,14 @@
                             <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                                 <Label Text="Daily" FontSize="16" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                <Label Text="One-day report · 1 template" FontSize="12"
+                                <Label Text="Format a one-day attendance report" FontSize="12"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
-                            <Button x:Name="DailyTemplateButton" Grid.Column="2" Text="Choose"
-                                    BackgroundColor="#059669" TextColor="White" FontSize="13" FontAttributes="Bold"
-                                    CornerRadius="11" Padding="12,9" VerticalOptions="Center"
+                            <Button x:Name="DailyTemplateButton" Grid.Column="2" Text="Select"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                                    FontSize="13" FontAttributes="Bold"
+                                    CornerRadius="11" Padding="13,9" VerticalOptions="Center"
                                     Clicked="OnDailyTemplateClicked" />
                         </Grid>
                     </Border>
@@ -91,11 +96,11 @@
                     <Border x:Name="MonthlyTemplateCard"
                             Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
                             BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                            StrokeShape="RoundRectangle 18" Padding="14">
+                            StrokeShape="RoundRectangle 18" Padding="15">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Border WidthRequest="42" HeightRequest="42" StrokeThickness="0"
+                            <Border WidthRequest="44" HeightRequest="44" StrokeThickness="0"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
-                                    StrokeShape="RoundRectangle 13" VerticalOptions="Center">
+                                    StrokeShape="RoundRectangle 14" VerticalOptions="Center">
                                 <Label Text="M" FontSize="19" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
@@ -103,15 +108,18 @@
                             <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                                 <Label Text="Monthly" FontSize="16" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                <Label Text="Month report · 1 template" FontSize="12"
+                                <Label Text="Format a monthly attendance report" FontSize="12"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
-                            <Button x:Name="MonthlyTemplateButton" Grid.Column="2" Text="Choose"
-                                    BackgroundColor="#059669" TextColor="White" FontSize="13" FontAttributes="Bold"
-                                    CornerRadius="11" Padding="12,9" VerticalOptions="Center"
+                            <Button x:Name="MonthlyTemplateButton" Grid.Column="2" Text="Select"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                                    FontSize="13" FontAttributes="Bold"
+                                    CornerRadius="11" Padding="13,9" VerticalOptions="Center"
                                     Clicked="OnMonthlyTemplateClicked" />
                         </Grid>
                     </Border>
+
                 </VerticalStackLayout>
 
                 <Border x:Name="UploadCard" IsVisible="False"
@@ -130,7 +138,8 @@
 
                         <Button x:Name="PickFileBtn"
                                 Text="Choose report file"
-                                BackgroundColor="#059669" TextColor="White"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
                                 FontSize="16" FontAttributes="Bold"
                                 CornerRadius="14" HeightRequest="52"
                                 Clicked="OnPickFileClicked" />
@@ -184,7 +193,7 @@
                 <Button Grid.Column="1"
                         Text="Convert another file"
                         BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
-                        BorderColor="#059669" BorderWidth="1"
+                        BorderColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}" BorderWidth="1"
                         FontSize="13" FontAttributes="Bold"
                         CornerRadius="12" Padding="16,10"
                         VerticalOptions="Center"
@@ -228,7 +237,8 @@
                     <HorizontalStackLayout Spacing="4">
                         <Button x:Name="TabTableBtn" Text="Table" CornerRadius="9" Padding="18,8"
                                 FontSize="13" FontAttributes="Bold"
-                                BackgroundColor="#059669" TextColor="White"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
                                 Clicked="OnTabTableClicked" />
                         <Button x:Name="TabDashboardBtn" Text="Dashboard" CornerRadius="9" Padding="18,8"
                                 FontSize="13" FontAttributes="Bold"
@@ -317,7 +327,7 @@
 
         <ActivityIndicator Grid.Row="1" x:Name="Spinner"
                            IsRunning="False" IsVisible="False"
-                           Color="#059669"
+                           Color="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
                            VerticalOptions="Center" HorizontalOptions="Center" />
     </Grid>
 

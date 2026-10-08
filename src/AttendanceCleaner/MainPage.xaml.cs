@@ -140,9 +140,15 @@ public partial class MainPage : ContentPage
         DailyTemplateCard.Stroke = new SolidColorBrush(
             _selectedCategory == ReportCategory.Daily ? selectedColor : borderColor);
         DailyTemplateCard.StrokeThickness = _selectedCategory == ReportCategory.Daily ? 2 : 1;
+        SetThemeColor(DailyTemplateCard, Border.BackgroundColorProperty,
+            _selectedCategory == ReportCategory.Daily ? "AccentSurfaceLight" : "SurfaceLight",
+            _selectedCategory == ReportCategory.Daily ? "AccentSurfaceDark" : "SurfaceDark");
         MonthlyTemplateCard.Stroke = new SolidColorBrush(
             _selectedCategory == ReportCategory.Monthly ? selectedColor : borderColor);
         MonthlyTemplateCard.StrokeThickness = _selectedCategory == ReportCategory.Monthly ? 2 : 1;
+        SetThemeColor(MonthlyTemplateCard, Border.BackgroundColorProperty,
+            _selectedCategory == ReportCategory.Monthly ? "AccentSurfaceLight" : "SurfaceLight",
+            _selectedCategory == ReportCategory.Monthly ? "AccentSurfaceDark" : "SurfaceDark");
     }
 
     private async void OnPickFileClicked(object? sender, EventArgs e)
@@ -352,8 +358,8 @@ public partial class MainPage : ContentPage
         TableCard.IsVisible = true;
         DashboardSection.IsVisible = false;
         SavePdfBtn.IsVisible = false;
-        TabTableBtn.BackgroundColor = GetThemeColor("SuccessLight");
-        TabTableBtn.TextColor = Colors.White;
+        SetThemeColor(TabTableBtn, Button.BackgroundColorProperty, "ActionLight", "ActionDark");
+        SetThemeColor(TabTableBtn, Button.TextColorProperty, "ActionTextLight", "ActionTextDark");
         SetThemeColor(TabDashboardBtn, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
         SetThemeColor(TabDashboardBtn, Button.TextColorProperty, "TextBodyLight", "TextBodyDark");
     }
@@ -363,8 +369,8 @@ public partial class MainPage : ContentPage
         TableCard.IsVisible = false;
         DashboardSection.IsVisible = true;
         SavePdfBtn.IsVisible = true;
-        TabDashboardBtn.BackgroundColor = GetThemeColor("SuccessLight");
-        TabDashboardBtn.TextColor = Colors.White;
+        SetThemeColor(TabDashboardBtn, Button.BackgroundColorProperty, "ActionLight", "ActionDark");
+        SetThemeColor(TabDashboardBtn, Button.TextColorProperty, "ActionTextLight", "ActionTextDark");
         SetThemeColor(TabTableBtn, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
         SetThemeColor(TabTableBtn, Button.TextColorProperty, "TextBodyLight", "TextBodyDark");
     }
@@ -450,7 +456,7 @@ public partial class MainPage : ContentPage
         {
             var g = new Grid();
             if (header)
-                g.BackgroundColor = GetThemeColor("SuccessLight");
+                SetThemeColor(g, Grid.BackgroundColorProperty, "ActionLight", "ActionDark");
             else
                 SetThemeColor(g, Grid.BackgroundColorProperty,
                     alt ? "SurfaceAltLight" : "SurfaceLight",
@@ -464,12 +470,14 @@ public partial class MainPage : ContentPage
                     Text = cells[c],
                     FontSize = 12,
                     FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
-                    TextColor = header ? Colors.White : GetThemeColor("TextBodyLight"),
+                    TextColor = GetThemeColor(header ? "ActionTextLight" : "TextBodyLight"),
                     Padding = new Thickness(6, header ? 10 : 8),
                     HorizontalTextAlignment = c == 1 ? TextAlignment.Start : TextAlignment.Center,
                     VerticalTextAlignment = TextAlignment.Center,
                 };
-                if (!header)
+                if (header)
+                    SetThemeColor(label, Label.TextColorProperty, "ActionTextLight", "ActionTextDark");
+                else
                     SetThemeColor(label, Label.TextColorProperty, "TextBodyLight", "TextBodyDark");
                 g.Add(label, c);
             }
@@ -593,7 +601,7 @@ public partial class MainPage : ContentPage
     {
         var grid = new Grid();
         if (header)
-            grid.BackgroundColor = GetThemeColor("SuccessLight");
+            SetThemeColor(grid, Grid.BackgroundColorProperty, "ActionLight", "ActionDark");
         else
             SetThemeColor(grid, Grid.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
 
@@ -605,7 +613,7 @@ public partial class MainPage : ContentPage
                 Text = c < cells.Count ? cells[c] : "",
                 FontSize = 12,
                 FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
-                TextColor = header ? Colors.White : GetThemeColor("TextBodyLight"),
+                TextColor = GetThemeColor(header ? "ActionTextLight" : "TextBodyLight"),
                 Padding = new Thickness(6, header ? 10 : 8),
                 HorizontalTextAlignment = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0
                     ? TextAlignment.Start
@@ -613,7 +621,9 @@ public partial class MainPage : ContentPage
                 LineBreakMode = LineBreakMode.NoWrap,
                 VerticalTextAlignment = TextAlignment.Center,
             };
-            if (!header)
+            if (header)
+                SetThemeColor(label, Label.TextColorProperty, "ActionTextLight", "ActionTextDark");
+            else
                 SetThemeColor(label, Label.TextColorProperty, "TextBodyLight", "TextBodyDark");
             Grid.SetRow(label, 0);
             Grid.SetColumn(label, c);

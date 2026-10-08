@@ -44,6 +44,10 @@
     <Color x:Key="TextSecondaryDark">#9CA3AF</Color>
     <Color x:Key="SuccessLight">#059669</Color>
     <Color x:Key="SuccessDark">#34D399</Color>
+    <Color x:Key="ActionLight">#047857</Color>
+    <Color x:Key="ActionDark">#10B981</Color>
+    <Color x:Key="ActionTextLight">#FFFFFF</Color>
+    <Color x:Key="ActionTextDark">#052E2B</Color>
     <Color x:Key="AccentSurfaceLight">#D1FAE5</Color>
     <Color x:Key="AccentSurfaceDark">#064E3B</Color>
     <Color x:Key="AccentTextLight">#065F46</Color>
