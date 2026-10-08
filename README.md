@@ -19,6 +19,10 @@ After converting, the results screen has two tabs:
 
 **Save dashboard as PDF** generates a landscape A4 report with all of the above (KPIs, chart, employee table, page numbers) and opens the save dialog — suggested name `Attendance Dashboard <Month Year>.pdf`. PDF export is available in the Windows build.
 
+Daily Excel and dashboard worked hours prefer a positive reported Attended duration, falling back to the punch interval. Monthly duty/OT limits still apply separately; overtime never exceeds the available total duration. Average punch times account for midnight and overnight departures. PDF trends use panels of at most 31 dates so longer ranges remain readable.
+
+Cancelling the Windows Save As dialog creates no file. Other platforms save to the app's fallback directory.
+
 ## Supported inputs
 
 The attendance software exports HTML tables with an `.xls` extension. Three layouts are recognised (auto-detected):
@@ -33,11 +37,17 @@ The `Sep Monthly Over View Report` contains attendance statuses but no punch tim
 
 The importer handles every calendar month, including 28/29-day February and 30/31-day months, using the dates inside the export. Numeric dates use **day-month-year** (with `-`, `/`, or `.`), or ISO **year-month-day**; single-digit days/months and timestamps are accepted. Monthly dates are checked against the report's declared From/To range. Invalid dates and incomplete attendance rows produce an import error instead of silently dropping data or inventing dates.
 
+The app and CLI share decoding for Unicode BOMs and declared HTML character sets. Employee identifiers may contain letters or leading zeros. Monthly metric rows can appear before or after Status; conflicting repeated metrics are rejected. Leave totals include only the Leave header's columns.
+
+Dashboard and monthly summaries count identical employee/date records once. Conflicting records for the same employee/date produce a clear error instead of discarding a shift or counting two attendance days. The daily writer continues to preserve source rows.
+
 Automated calendar regression tests cover every month from **2026 through 2036** (the current year plus ten future years) across all three import formats and both monthly workbook layouts. They check exact dates and punches, month lengths and weekdays, partial exports, skipped days at every month/year boundary, and acceptance or rejection of February 29. This validates the supported export layouts; each year's holidays and working Saturdays still come from the editable calendar.
 
 Partial monthly exports count **only the exported dates** in attendance totals. Unreported dates stay blank, and the Remarks column shows the number of reported dates. Monthly templates accept one calendar month at a time; export separate files for ranges spanning multiple months. The parser can map day columns correctly across month/year boundaries, including skipped days.
 
 The bundled holiday calendar is for **2026**. For another year, configure that year's holidays and working Saturdays in **Manage holidays**. If no calendar entries exist for the report year, the app and the workbook's Holiday Details sheet show a warning.
+
+Working Saturday entries must fall on Saturdays. Calendar edits preserve changes to other entries from another app window; competing edits to the same entry require reloading the manager. Invalid calendar entries produce a validation error without replacing the saved calendar.
 
 ## Removing the Windows warning (code signing)
 

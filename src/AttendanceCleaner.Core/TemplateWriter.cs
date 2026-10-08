@@ -117,7 +117,11 @@ public static class TemplateWriter
         : record.InPunch != null || record.OutPunch != null ? TemplateSpec.RemarkInPunchOnly
         : TemplateSpec.RemarkAbsent;
 
-    private static string? TotalHours(AttendanceRecord record)
+    private static string? TotalHours(AttendanceRecord record) =>
+        WorkedMinutes(record) is { } minutes ? AttendanceTime.FormatMinutes(minutes) : null;
+
+    /// <summary>Use the export's attended duration consistently before falling back to punches.</summary>
+    internal static int? WorkedMinutes(AttendanceRecord record)
     {
         if (AttendanceTime.TryParseHours(record.Attended, out var hours) && hours > 0)
         {
@@ -125,11 +129,42 @@ public static class TemplateWriter
             if (hours <= int.MaxValue / 60m)
             {
                 var reportedMinutes = (int)decimal.Round(hours * 60m, 0, MidpointRounding.AwayFromZero);
-                if (reportedMinutes > 0) return AttendanceTime.FormatMinutes(reportedMinutes);
+                if (reportedMinutes > 0) return reportedMinutes;
             }
         }
 
-        var minutes = AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch);
-        return minutes is { } duration ? AttendanceTime.FormatMinutes(duration) : null;
+        return AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch);
+    }
+
+    /// <summary>Count repeated observations once and refuse contradictory employee/day records.</summary>
+    internal static IReadOnlyList<AttendanceRecord> DistinctEmployeeDates(IEnumerable<AttendanceRecord> records)
+    {
+        var unique = new List<AttendanceRecord>();
+        foreach (var group in records.GroupBy(record => (record.Id, record.Name, record.Date)))
+        {
+            var first = group.First();
+            if (group.Skip(1).Any(record => !SameAttendance(first, record)))
+                throw new InvalidDataException(
+                    $"Conflicting attendance rows for employee '{first.Id}' ({first.Name}) on "
+                    + $"{first.Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}. "
+                    + "Export one attendance observation per employee and date, or resolve the duplicate rows.");
+            unique.Add(first);
+        }
+        return unique;
+    }
+
+    private static bool SameAttendance(AttendanceRecord first, AttendanceRecord other) =>
+        first.InPunch == other.InPunch
+        && first.OutPunch == other.OutPunch
+        && SameMetric(first.Attended, other.Attended)
+        && SameMetric(first.Overtime, other.Overtime)
+        && string.Equals(first.Status?.Trim(), other.Status?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameMetric(string? first, string? other)
+    {
+        if (AttendanceTime.TryParseHours(first, out var firstHours)
+            && AttendanceTime.TryParseHours(other, out var otherHours))
+            return firstHours == otherHours;
+        return string.Equals(first?.Trim(), other?.Trim(), StringComparison.Ordinal);
     }
 }

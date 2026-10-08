@@ -12,7 +12,8 @@ public sealed class IndiaTimeClock
     private static readonly Uri TimeApiEndpoint = new(
         "https://timeapi.io/api/Time/current/zone?timeZone=Asia%2FKolkata");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+    private static readonly TimeSpan SynchronizationTimeout = TimeSpan.FromSeconds(5);
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = SynchronizationTimeout };
 
     private readonly object _sync = new();
     private readonly HttpClient _httpClient;
@@ -40,17 +41,22 @@ public sealed class IndiaTimeClock
     public async Task<bool> SynchronizeAsync(CancellationToken cancellationToken = default)
     {
         var requestStarted = Stopwatch.GetTimestamp();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var clientTimeout = _httpClient.Timeout;
+        timeout.CancelAfter(clientTimeout == Timeout.InfiniteTimeSpan || clientTimeout > SynchronizationTimeout
+            ? SynchronizationTimeout : clientTimeout);
+        var requestToken = timeout.Token;
         try
         {
             using var response = await _httpClient.GetAsync(
                 TimeApiEndpoint,
                 HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
+                requestToken);
             response.EnsureSuccessStatusCode();
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var stream = await response.Content.ReadAsStreamAsync(requestToken);
             var payload = await JsonSerializer.DeserializeAsync<TimeApiResponse>(
-                stream, JsonOptions, cancellationToken);
+                stream, JsonOptions, requestToken);
 
             if (payload is null || !string.Equals(payload.TimeZone, "Asia/Kolkata", StringComparison.Ordinal))
                 return false;

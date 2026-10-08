@@ -58,8 +58,9 @@ public static class MonthlyTemplateWriter
         DateOnly month,
         IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
-        var records = source.Where(record => record.Date.Year == month.Year && record.Date.Month == month.Month)
-            .ToList();
+        holidays = HolidayCalendarStore.ValidateAndSort(holidays);
+        var records = TemplateWriter.DistinctEmployeeDates(source
+            .Where(record => record.Date.Year == month.Year && record.Date.Month == month.Month));
         var mandatoryHolidayDates = holidays
             .Where(entry => MonthlyTemplateSpec.IsMandatoryHoliday(entry.Category))
             .Select(entry => entry.Date)
@@ -162,7 +163,8 @@ public static class MonthlyTemplateWriter
         Stream output,
         IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
-        var records = source.ToList();
+        var records = TemplateWriter.DistinctEmployeeDates(source);
+        holidays = HolidayCalendarStore.ValidateAndSort(holidays);
         if (records.Count == 0)
             throw new InvalidDataException("The monthly report has no attendance records.");
 
@@ -615,20 +617,14 @@ public static class MonthlyTemplateWriter
 
     private static (decimal Duty, decimal Overtime) CalculateHours(AttendanceRecord record)
     {
-        var hasAttended = AttendanceTime.TryParseHours(record.Attended, out var attended) && attended > 0;
-        var punchTotal = GetPunchDurationHours(record.InPunch, record.OutPunch);
-        var total = hasAttended ? attended : punchTotal;
+        var total = (TemplateWriter.WorkedMinutes(record) ?? 0) / 60m;
         var reportedOvertime = AttendanceTime.TryParseHours(record.Overtime, out var reported) && reported > 0 ? reported : 0;
         var punchOvertime = GetPunchWindowHours(record, MonthlyTemplateSpec.DutyEnd, MonthlyTemplateSpec.OvertimeEnd);
-        var overtime = Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours, reportedOvertime > 0 ? reportedOvertime : punchOvertime);
+        var overtime = Math.Min(total, Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours,
+            reportedOvertime > 0 ? reportedOvertime : punchOvertime));
         if (overtime == 0 && total > MonthlyTemplateSpec.DutyHours) overtime = Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours, total - MonthlyTemplateSpec.DutyHours);
         var duty = Math.Min(MonthlyTemplateSpec.DutyHours, Math.Max(0, total - overtime));
         return (decimal.Round(duty, 2), decimal.Round(overtime, 2));
-    }
-
-    private static decimal GetPunchDurationHours(string? inPunch, string? outPunch)
-    {
-        return (AttendanceTime.PunchDurationMinutes(inPunch, outPunch) ?? 0) / 60m;
     }
 
     private static decimal GetPunchWindowHours(AttendanceRecord record, TimeOnly fromTime, TimeOnly toTime)

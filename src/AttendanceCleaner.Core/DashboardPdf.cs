@@ -65,38 +65,43 @@ public static class DashboardPdf
                         row.RelativeItem().Kpi("Avg hours", d.AverageHours ?? "-", "#111827");
                     });
 
-                    // daily trend chart
-                    col.Item().Border(1).BorderColor("#E2E8F0").Padding(10).Column(chartCol =>
+                    // Keep each chart panel intact, and keep daily labels legible for long reports.
+                    foreach (var days in d.Days.OrderBy(day => day.Date).Chunk(31))
                     {
-                        chartCol.Item().Text("Daily attendance").Bold().FontSize(11);
-                        var max = Math.Max(1, d.Days.Max(x => Math.Max(x.Present, x.Absent)));
-                        chartCol.Item().PaddingTop(6).Height(110).Row(bars =>
+                        col.Item().ShowEntire().Border(1).BorderColor("#E2E8F0").Padding(10).Column(chartCol =>
                         {
-                            foreach (var day in d.Days)
+                            chartCol.Item().Text($"Daily attendance · {days[0].Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}"
+                                + $" to {days[^1].Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}")
+                                .Bold().FontSize(11);
+                            var max = Math.Max(1, days.Max(day => day.Present + day.Absent));
+                            chartCol.Item().PaddingTop(6).Height(110).Row(bars =>
                             {
-                                bars.RelativeItem().Column(barCol =>
+                                foreach (var day in days)
                                 {
-                                    barCol.Item().AlignBottom().Height((float)(90.0 * day.Present / max))
-                                        .Background("#059669").PaddingHorizontal(1);
-                                    barCol.Item().Height((float)(90.0 * day.Absent / max))
-                                        .Background("#FCA5A5").PaddingHorizontal(1);
-                                    barCol.Item().PaddingTop(2).AlignCenter()
-                                        .Text(day.Date.Day.ToString(CultureInfo.InvariantCulture))
-                                        .FontSize(6).FontColor("#6B7280");
-                                });
-                            }
+                                    bars.RelativeItem().AlignBottom().Column(barCol =>
+                                    {
+                                        barCol.Item().Height((float)(90.0 * day.Present / max))
+                                            .Background("#059669").PaddingHorizontal(1);
+                                        barCol.Item().Height((float)(90.0 * day.Absent / max))
+                                            .Background("#FCA5A5").PaddingHorizontal(1);
+                                        barCol.Item().PaddingTop(2).AlignCenter()
+                                            .Text(day.Date.ToString("dd MMM", CultureInfo.InvariantCulture))
+                                            .FontSize(6).FontColor("#6B7280");
+                                    });
+                                }
+                            });
+                            chartCol.Item().PaddingTop(2).Row(legend =>
+                            {
+                                legend.ConstantItem(10).Height(8).Background("#059669");
+                                legend.ConstantItem(4);
+                                legend.AutoItem().Text("present").FontSize(7).FontColor("#6B7280");
+                                legend.ConstantItem(10);
+                                legend.ConstantItem(10).Height(8).Background("#FCA5A5");
+                                legend.ConstantItem(4);
+                                legend.AutoItem().Text("absent").FontSize(7).FontColor("#6B7280");
+                            });
                         });
-                        chartCol.Item().PaddingTop(2).Row(legend =>
-                        {
-                            legend.ConstantItem(10).Height(8).Background("#059669");
-                            legend.ConstantItem(4);
-                            legend.AutoItem().Text("present").FontSize(7).FontColor("#6B7280");
-                            legend.ConstantItem(10);
-                            legend.ConstantItem(10).Height(8).Background("#FCA5A5");
-                            legend.ConstantItem(4);
-                            legend.AutoItem().Text("absent").FontSize(7).FontColor("#6B7280");
-                        });
-                    });
+                    }
 
                     // per-employee summary table
                     col.Item().Border(1).BorderColor("#E2E8F0").Table(table =>

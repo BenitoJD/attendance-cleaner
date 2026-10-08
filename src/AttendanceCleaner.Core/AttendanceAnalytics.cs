@@ -40,7 +40,7 @@ public static class AttendanceAnalytics
 {
     public static Dashboard Build(IEnumerable<AttendanceRecord> records)
     {
-        var all = records as IReadOnlyList<AttendanceRecord> ?? records.ToList();
+        var all = TemplateWriter.DistinctEmployeeDates(records);
         if (all.Count == 0)
         {
             throw new InvalidDataException("No attendance rows were found in this file.");
@@ -76,8 +76,8 @@ public static class AttendanceAnalytics
                     empPresent,
                     empAbsent,
                     empInOnly,
-                    AveragePunch(g, r => r.InPunch),
-                    AveragePunch(g, r => r.OutPunch),
+                    AveragePunch(g, outPunch: false),
+                    AveragePunch(g, outPunch: true),
                     AverageHours(g),
                     100.0 * empPresent / g.Count());
             })
@@ -93,23 +93,51 @@ public static class AttendanceAnalytics
             InPunchOnly: inOnly,
             PresentRate: 100.0 * present / all.Count,
             AbsentRate: 100.0 * absent / all.Count,
-            AverageIn: AveragePunch(all, r => r.InPunch),
-            AverageOut: AveragePunch(all, r => r.OutPunch),
+            AverageIn: AveragePunch(all, outPunch: false),
+            AverageOut: AveragePunch(all, outPunch: true),
             AverageHours: AverageHours(all),
             Employees: employees,
             Days: days);
     }
 
     /// <summary>Average punch time as "HH:mm" (over the rows that have that punch), rounded to the minute.</summary>
-    private static string? AveragePunch(IEnumerable<AttendanceRecord> rows, Func<AttendanceRecord, string?> punch)
+    private static string? AveragePunch(IEnumerable<AttendanceRecord> rows, bool outPunch)
     {
-        var minutes = rows.Select(punch).Where(p => p != null)
-            .Select(p => AttendanceTime.TryParsePunch(p, out var time)
-                ? time : throw new FormatException($"Invalid normalized punch: {p}"))
-            .Select(t => t.Hour * 60 + t.Minute)
-            .ToList();
+        const int minutesPerDay = 24 * 60;
+        var minutes = new List<int>();
+        foreach (var row in rows)
+        {
+            var punch = outPunch ? row.OutPunch : row.InPunch;
+            if (punch is null) continue;
+            if (!AttendanceTime.TryParsePunch(punch, out var time))
+                throw new FormatException($"Invalid normalized punch: {punch}");
+            var value = time.Hour * 60 + time.Minute;
+            // Departures after an overnight shift belong after that shift's check-in.
+            if (outPunch && AttendanceTime.TryParsePunch(row.InPunch, out var start) && time < start)
+                value += minutesPerDay;
+            minutes.Add(value);
+        }
         if (minutes.Count == 0) return null;
-        var avg = (int)Math.Round(minutes.Average());
+
+        // Align anchored departures onto a shared clock interval when they cluster around midnight.
+        {
+            // Unwrap the shortest clock interval, so 23:50 and 00:10 average to midnight.
+            var clockValues = minutes.Select(value => value % minutesPerDay).Order().ToArray();
+            var largestGap = -1;
+            var intervalStart = clockValues[0];
+            for (var index = 0; index < clockValues.Length; index++)
+            {
+                var next = clockValues[(index + 1) % clockValues.Length];
+                var gap = next + (index == clockValues.Length - 1 ? minutesPerDay : 0) - clockValues[index];
+                if (gap <= largestGap) continue;
+                largestGap = gap;
+                intervalStart = next;
+            }
+            if (largestGap > minutesPerDay / 2)
+                minutes = clockValues.Select(value => value < intervalStart ? value + minutesPerDay : value).ToList();
+        }
+
+        var avg = (int)Math.Round(minutes.Average()) % minutesPerDay;
         return AttendanceTime.FormatMinutes(avg);
     }
 
@@ -117,7 +145,7 @@ public static class AttendanceAnalytics
     private static string? AverageHours(IEnumerable<AttendanceRecord> rows)
     {
         var spans = rows.Where(r => r.InPunch != null && r.OutPunch != null)
-            .Select(r => AttendanceTime.PunchDurationMinutes(r.InPunch, r.OutPunch)
+            .Select(r => TemplateWriter.WorkedMinutes(r)
                 ?? throw new FormatException("Invalid normalized attendance punches."))
             .ToList();
         if (spans.Count == 0) return null;

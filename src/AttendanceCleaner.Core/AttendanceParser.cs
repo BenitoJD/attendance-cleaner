@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 
@@ -13,6 +14,8 @@ namespace AttendanceCleaner.Core;
 /// </summary>
 public static partial class AttendanceParser
 {
+    static AttendanceParser() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
     // Row/section labels used by the software's exports (matched case-insensitively).
     private const string LabelPersonId = "Person ID";
     private const string LabelEmployeeName = "Employee Name";
@@ -37,14 +40,49 @@ public static partial class AttendanceParser
 
     public static ParsedReport ParseFile(string path)
     {
-        using (var stream = File.OpenRead(path))
+        return ParseBytes(File.ReadAllBytes(path));
+    }
+
+    /// <summary>Decodes the export consistently for file paths and platform file-picker streams.</summary>
+    public static ParsedReport ParseBytes(ReadOnlySpan<byte> bytes)
+    {
+        ValidateInputIsNotWorkbook(bytes[..Math.Min(8, bytes.Length)]);
+        Encoding encoding;
+        int preambleLength;
+        if (bytes.StartsWith(new byte[] { 0xFF, 0xFE, 0x00, 0x00 }))
+            (encoding, preambleLength) = (new UTF32Encoding(false, false, true), 4);
+        else if (bytes.StartsWith(new byte[] { 0x00, 0x00, 0xFE, 0xFF }))
+            (encoding, preambleLength) = (new UTF32Encoding(true, false, true), 4);
+        else if (bytes.StartsWith(new byte[] { 0xFF, 0xFE }))
+            (encoding, preambleLength) = (new UnicodeEncoding(false, false, true), 2);
+        else if (bytes.StartsWith(new byte[] { 0xFE, 0xFF }))
+            (encoding, preambleLength) = (new UnicodeEncoding(true, false, true), 2);
+        else if (bytes.StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
+            (encoding, preambleLength) = (new UTF8Encoding(false, true), 3);
+        else
         {
-            Span<byte> signature = stackalloc byte[8];
-            var length = stream.Read(signature);
-            ValidateInputIsNotWorkbook(signature[..length]);
+            preambleLength = 0;
+            var prefix = Encoding.ASCII.GetString(bytes[..Math.Min(4096, bytes.Length)]);
+            var charset = Regex.Match(prefix, "<meta\\b[^>]*\\bcharset\\s*=\\s*[\"']?\\s*(?<name>[a-z0-9._-]+)", RegexOptions.IgnoreCase);
+            try
+            {
+                encoding = charset.Success
+                    ? Encoding.GetEncoding(charset.Groups["name"].Value, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)
+                    : new UTF8Encoding(false, true);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new InvalidDataException("The export declares an unsupported text encoding. Export the report again using Unicode or UTF-8.", exception);
+            }
         }
-        var html = File.ReadAllText(path);
-        return Parse(html);
+        try
+        {
+            return Parse(encoding.GetString(bytes[preambleLength..]));
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidDataException("The export contains invalid text for its encoding. Download the report again or export it using Unicode or UTF-8.", exception);
+        }
     }
 
     /// <summary>
@@ -190,7 +228,13 @@ public static partial class AttendanceParser
             if (row.Skip(finalDayColumn + 1).Any(value => NormalizeMetric(value) is { } metric
                 && !(decimal.TryParse(metric, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) && number == 0)))
                 throw new InvalidDataException($"The monthly '{Cell(row, 0)}' row for employee '{id}' contains data without a date column.");
-            foreach (var col in dayByColumn.Keys) values[col] = Cell(row, col);
+            foreach (var col in dayByColumn.Keys)
+            {
+                var value = Cell(row, col);
+                if (values.TryGetValue(col, out var previous) && !MetricValuesEqual(Cell(row, 0), previous, value))
+                    throw new InvalidDataException($"Conflicting monthly '{Cell(row, 0)}' rows for employee '{id}' ({name}) on {dayByColumn[col]:dd-MM-yyyy}.");
+                values[col] = value;
+            }
         }
 
         void Flush()
@@ -267,8 +311,6 @@ public static partial class AttendanceParser
             else if (Same(label, LabelStatus) && dayByColumn != null)
             {
                 ReadMetric(row, statuses!);
-                Flush();
-                dayByColumn = null;
             }
         }
         Flush();
@@ -278,20 +320,19 @@ public static partial class AttendanceParser
 
     private static (string Id, string Name) ExtractBlockIdentity(List<string> row)
     {
-        string id = "", name = "";
-        foreach (var cell in row.Skip(1))
-        {
-            if (cell.Length == 0 || BlockFieldLabels.Contains(cell)) continue;
-            if (cell.All(char.IsDigit) && id.Length == 0)
-            {
-                id = cell;
-            }
-            else if (name.Length == 0 && !cell.All(char.IsDigit))
-            {
-                name = cell;
-            }
-        }
+        var id = FieldValue(LabelPersonId);
+        var name = FieldValue(LabelEmployeeName);
+        if (id.Length == 0 || name.Length == 0)
+            throw new InvalidDataException("The monthly report has an employee block without a Person ID or Employee Name.");
         return (id, name);
+
+        string FieldValue(string label)
+        {
+            var index = FindIndex(row, label);
+            return index < 0 ? "" : row.Skip(index + 1)
+                .TakeWhile(cell => !BlockFieldLabels.Contains(cell))
+                .FirstOrDefault(cell => !string.IsNullOrWhiteSpace(cell)) ?? "";
+        }
     }
 
     // --- Monthly performance report: metric rows per employee, days as columns ---
@@ -349,9 +390,11 @@ public static partial class AttendanceParser
         int ixAbsent = FindHeader(header, value => NormalizeHeader(value).StartsWith("absent", StringComparison.Ordinal));
         int ixAttended = FindHeader(header, value => NormalizeHeader(value).StartsWith("attendedactual", StringComparison.Ordinal));
         int ixLeave = FindHeader(header, value => Same(value, "Leave"));
+        var leaveEnd = ixLeave < 0 ? 0 : Enumerable.Range(ixLeave + 1, header.Count - ixLeave - 1)
+            .FirstOrDefault(column => !string.IsNullOrWhiteSpace(Cell(header, column)), header.Count);
         var leaveColumns = ixLeave < 0
             ? Array.Empty<int>()
-            : Enumerable.Range(ixLeave, Math.Max(0, summaryHeader.Count - ixLeave))
+            : Enumerable.Range(ixLeave, Math.Max(0, Math.Min(leaveEnd, summaryHeader.Count) - ixLeave))
                 .Where(column => !string.IsNullOrWhiteSpace(Cell(summaryHeader, column)))
                 .ToArray();
 
@@ -387,8 +430,13 @@ public static partial class AttendanceParser
                 decimal? attendedDays = ReadDecimal(row, ixAttended);
                 decimal? leaveDays = SumDecimalCells(row, leaveColumns);
                 if (absentDays is not null || attendedDays is not null || leaveDays is not null)
-                    employeeTotals[key] = new MonthlyEmployeeTotals(Cell(row, ixId), Cell(row, ixName), no,
+                {
+                    var totals = new MonthlyEmployeeTotals(Cell(row, ixId), Cell(row, ixName), no,
                         absentDays, attendedDays, leaveDays);
+                    if (employeeTotals.TryGetValue(key, out var previous) && previous != totals)
+                        throw new InvalidDataException($"Conflicting monthly summary totals for employee '{key.Id}' ({key.Name}).");
+                    employeeTotals[key] = totals;
+                }
             }
             var values = new Dictionary<int, string>();
             foreach (var col in dayColumns) values[col] = Cell(row, col);
@@ -397,6 +445,9 @@ public static partial class AttendanceParser
                 : isAttended ? LabelAttended
                 : isOvertime ? LabelOvertime
                 : LabelStatus;
+            if (metrics.TryGetValue(metricName, out var previousValues)
+                && dayColumns.Any(column => !MetricValuesEqual(metricName, previousValues[column], values[column])))
+                throw new InvalidDataException($"Conflicting monthly '{label}' rows for employee '{key.Id}' ({key.Name}).");
             metrics[metricName] = values;
         }
 
@@ -524,6 +575,11 @@ public static partial class AttendanceParser
 
     private static bool IsOvertimeLabel(string value) =>
         Same(value, LabelOvertime) || Same(value, "Overtime") || Same(value, "Over Time");
+
+    private static bool MetricValuesEqual(string label, string left, string right) =>
+        Same(label, LabelCheckIn) || Same(label, LabelCheckOut)
+            ? NormalizePunch(left) == NormalizePunch(right)
+            : NormalizeMetric(left) == NormalizeMetric(right);
 
     private static bool IsMonthlySummaryHeader(string value)
     {

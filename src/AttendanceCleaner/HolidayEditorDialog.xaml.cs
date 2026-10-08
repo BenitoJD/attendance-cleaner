@@ -61,9 +61,18 @@ public partial class HolidayEditorDialog : ContentView
 
         var category = _categories[CategoryPicker.SelectedIndex].Value;
         var selectedDate = DateOnly.FromDateTime(date);
-        Complete(_original is null
+        var entry = _original is null
             ? HolidayEntry.Create(selectedDate, name, category)
-            : _original with { Date = selectedDate, Name = name, Category = category });
+            : _original with { Date = selectedDate, Name = name, Category = category };
+        try
+        {
+            HolidayCalendarStore.ValidateAndSort([entry]);
+            Complete(entry);
+        }
+        catch (InvalidDataException ex)
+        {
+            ShowValidation(ex.Message);
+        }
     }
 
     private void ShowValidation(string message)

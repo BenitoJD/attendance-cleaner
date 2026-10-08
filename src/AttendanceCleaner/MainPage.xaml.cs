@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Collections.ObjectModel;
-using System.Text;
 using AttendanceCleaner.Core;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using RoundRectangle = Microsoft.Maui.Controls.Shapes.RoundRectangle;
@@ -238,14 +237,10 @@ public partial class MainPage : ContentPage
         HolidaySaveStatus.Text = "Loading holidays…";
         try
         {
-            if (!_holidaysLoaded)
-            {
-                var entries = await Task.Run(_holidayCalendarStore.LoadOrSeed);
-                _holidayEntries = new ObservableCollection<HolidayEntry>(entries);
-                HolidayList.ItemsSource = _holidayEntries;
-                _holidaysLoaded = true;
-                HolidayList.IsVisible = true;
-            }
+            var entries = await Task.Run(_holidayCalendarStore.LoadOrSeed);
+            RefreshHolidayEntries(entries);
+            _holidaysLoaded = true;
+            HolidayList.IsVisible = true;
             HolidaySaveStatus.Text = $"{_holidayEntries.Count} holidays saved.";
             UpdateHolidayTableWidth();
         }
@@ -302,19 +297,7 @@ public partial class MainPage : ContentPage
                 DateOnly.FromDateTime(_indiaTimeClock.CurrentTime.DateTime), HolidayCategoryOptions);
             if (updated is null) return;
 
-            var snapshot = HolidayCalendarStore.Sort(
-                _holidayEntries.Where(entry => entry.Id != updated.Id).Append(updated));
-            if (!await SaveHolidayCalendarAsync(snapshot)) return;
-
-            var destination = snapshot.ToList().FindIndex(entry => entry.Id == updated.Id);
-            var previous = holiday is null ? -1 : _holidayEntries.IndexOf(holiday);
-            if (previous < 0)
-                _holidayEntries.Insert(destination, updated);
-            else
-            {
-                _holidayEntries[previous] = updated;
-                if (previous != destination) _holidayEntries.Move(previous, destination);
-            }
+            await SaveHolidayCalendarAsync(() => _holidayCalendarStore.Upsert(updated, holiday));
         }
         finally
         {
@@ -333,9 +316,7 @@ public partial class MainPage : ContentPage
                 "Delete", "Cancel");
             if (!confirmed) return;
 
-            var snapshot = _holidayEntries.Where(entry => entry.Id != holiday.Id).ToArray();
-            if (await SaveHolidayCalendarAsync(snapshot))
-                _holidayEntries.Remove(holiday);
+            await SaveHolidayCalendarAsync(() => _holidayCalendarStore.Delete(holiday.Id, holiday));
         }
         finally
         {
@@ -343,13 +324,20 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private async Task<bool> SaveHolidayCalendarAsync(IReadOnlyCollection<HolidayEntry> entries)
+    private void RefreshHolidayEntries(IReadOnlyList<HolidayEntry> entries)
+    {
+        _holidayEntries = new ObservableCollection<HolidayEntry>(entries);
+        HolidayList.ItemsSource = _holidayEntries;
+    }
+
+    private async Task<bool> SaveHolidayCalendarAsync(Func<IReadOnlyList<HolidayEntry>> save)
     {
         SetHolidayBusy(true, showProgress: true);
         HolidaySaveStatus.Text = "Saving…";
         try
         {
-            await Task.Run(() => _holidayCalendarStore.Save(entries));
+            var entries = await Task.Run(save);
+            RefreshHolidayEntries(entries);
             HolidaySaveStatus.Text = $"Saved · {entries.Count} holidays";
             return true;
         }
@@ -469,6 +457,7 @@ public partial class MainPage : ContentPage
     private async void OnConvertClicked(object? sender, EventArgs e)
     {
         if (_selectedFile is null || _selectedCategory is null) return;
+        var selectedFile = _selectedFile;
         var selectedCategory = _selectedCategory.Value;
         var selectedMonthlyTemplate = _selectedMonthlyTemplate;
         if (selectedCategory == ReportCategory.Monthly && selectedMonthlyTemplate is null)
@@ -495,24 +484,13 @@ public partial class MainPage : ContentPage
             // 1. read and parse the report, work out the output file name
             var parsed = await Task.Run(async () =>
             {
-                string html;
-                using (var stream = await _selectedFile.OpenReadAsync())
+                ParsedReport report;
+                using (var stream = await selectedFile.OpenReadAsync())
                 using (var buffered = new MemoryStream())
                 {
                     await stream.CopyToAsync(buffered);
-                    var bytes = buffered.ToArray();
-
-                    AttendanceParser.ValidateInputIsNotWorkbook(bytes.AsSpan(0, Math.Min(8, bytes.Length)));
-
-                    html = Encoding.UTF8.GetString(bytes);
+                    report = AttendanceParser.ParseBytes(buffered.ToArray());
                 }
-                if (!html.Contains('<') || !html.Contains("table", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidDataException(
-                        "This file is not a recognised attendance export. Please choose the .xls file downloaded from the attendance software.");
-                }
-
-                var report = AttendanceParser.Parse(html);
                 var isMonthlyReport = report.Format is AttendanceExportFormat.MonthlyBlocks
                     or AttendanceExportFormat.MonthlyRows;
                 if ((selectedCategory == ReportCategory.Monthly) != isMonthlyReport)
@@ -560,13 +538,22 @@ public partial class MainPage : ContentPage
                     monthlyWarning = string.Join(" ", warnings.Where(warning => !string.IsNullOrWhiteSpace(warning)));
                 }
 
-                return (report, dates, fileName, monthlyWarning, holidays);
+                // Validate calculations before asking for a destination or writing a file.
+                var dashboard = AttendanceAnalytics.Build(report.Records);
+                var summaries = isMonthlyReport
+                    ? MonthlyTemplateWriter.BuildSummaries(report.Records, holidays, dates[0], report.EmployeeTotals)
+                    : null;
+                return (report, dates, fileName, monthlyWarning, holidays, dashboard, summaries);
             });
 
             // 2. let the user choose where to save it
             StatusLabel.Text = "Choose where to save the clean Excel...";
-            var outputPath = await AskForSaveLocationAsync(parsed.fileName, ".xlsx")
-                ?? Path.Combine(GetFallbackDirectory(), parsed.fileName);
+            var outputPath = await AskForSaveLocationAsync(parsed.fileName, ".xlsx");
+            if (outputPath is null)
+            {
+                StatusLabel.Text = "Save cancelled. No file was created.";
+                return;
+            }
             _outputDirectory = Path.GetDirectoryName(outputPath) ?? "";
 
             // 3. generate the workbook and write it
@@ -575,7 +562,7 @@ public partial class MainPage : ContentPage
             {
                 var built = TemplateWriter.BuildRows(parsed.report.Records);
                 using var ms = new MemoryStream();
-                IReadOnlyList<MonthlyEmployeeSummary>? summaries = null;
+                var summaries = parsed.summaries;
                 MonthlyWorkbookPreview? monthlyPreview = null;
                 if (selectedCategory == ReportCategory.Monthly)
                 {
@@ -586,8 +573,6 @@ public partial class MainPage : ContentPage
                     var workbookBytes = ms.ToArray();
                     using var previewStream = new MemoryStream(workbookBytes, writable: false);
                     monthlyPreview = MonthlyTemplateWriter.ReadPreview(previewStream);
-                    summaries = MonthlyTemplateWriter.BuildSummaries(
-                        parsed.report.Records, holidays, parsed.dates[0], parsed.report.EmployeeTotals);
                     File.WriteAllBytes(outputPath, workbookBytes);
                 }
                 else
@@ -617,7 +602,7 @@ public partial class MainPage : ContentPage
             _convertedRows = rows;
             BuildTable(rows);
 
-            _dashboard = AttendanceAnalytics.Build(parsed.report.Records);
+            _dashboard = parsed.dashboard;
             _sourceFileName = Path.GetFileName(outputPath);
             BuildDashboard();
 
@@ -644,8 +629,8 @@ public partial class MainPage : ContentPage
         }
     }
 
-    /// <summary>Windows: native "Save as" dialog so the user picks their own location.
-    /// Elsewhere: null (the caller uses the fallback directory).</summary>
+    /// <summary>Windows: null means the user cancelled the native Save As dialog.
+    /// Other platforms use the app's fallback directory.</summary>
     private async Task<string?> AskForSaveLocationAsync(string fileName, string extension)
     {
 #if WINDOWS
@@ -664,7 +649,11 @@ public partial class MainPage : ContentPage
             return file?.Path;
         }
 #endif
-        return null;
+#if WINDOWS
+        throw new InvalidOperationException("The Save As dialog is unavailable. Please reopen the app and try again.");
+#else
+        return Path.Combine(GetFallbackDirectory(), fileName);
+#endif
     }
 
     private string GetFallbackDirectory() =>
@@ -777,7 +766,7 @@ public partial class MainPage : ContentPage
     private void BuildChart(Dashboard d)
     {
         var grid = new Grid { VerticalOptions = LayoutOptions.End };
-        var max = Math.Max(1, d.Days.Max(x => Math.Max(x.Present, x.Absent)));
+        var max = Math.Max(1, d.Days.Max(x => x.Present + x.Absent));
 
         foreach (var day in d.Days)
         {
@@ -785,7 +774,7 @@ public partial class MainPage : ContentPage
             var column = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 0 };
             var presentBar = new BoxView
             {
-                HeightRequest = Math.Max(1, 100.0 * day.Present / max),
+                HeightRequest = 100.0 * day.Present / max,
                 WidthRequest = 14,
                 HorizontalOptions = LayoutOptions.Center,
             };
@@ -796,7 +785,7 @@ public partial class MainPage : ContentPage
                 column.Add(new BoxView
                 {
                     Color = Color.FromArgb("#FCA5A5"),
-                    HeightRequest = Math.Max(1, 100.0 * day.Absent / max),
+                    HeightRequest = 100.0 * day.Absent / max,
                     WidthRequest = 14,
                     HorizontalOptions = LayoutOptions.Center,
                 });
@@ -883,17 +872,23 @@ public partial class MainPage : ContentPage
     private async void OnSavePdfClicked(object? sender, EventArgs e)
     {
         if (_dashboard is null) return;
+        var dashboard = _dashboard;
+        var sourceFileName = _sourceFileName;
 
         SavePdfBtn.IsEnabled = false;
         DashStatus.Text = "Preparing PDF...";
 
         try
         {
-            var suggested = $"Attendance Dashboard {_dashboard.From:MMMM yyyy}.pdf";
-            var bytes = await Task.Run(() => DashboardPdf.Build(_dashboard, _sourceFileName));
+            var suggested = $"Attendance Dashboard {dashboard.From:MMMM yyyy}.pdf";
+            var bytes = await Task.Run(() => DashboardPdf.Build(dashboard, sourceFileName));
 
-            var outputPath = await AskForSaveLocationAsync(suggested, ".pdf")
-                ?? Path.Combine(GetFallbackDirectory(), suggested);
+            var outputPath = await AskForSaveLocationAsync(suggested, ".pdf");
+            if (outputPath is null)
+            {
+                DashStatus.Text = "Save cancelled. No PDF was created.";
+                return;
+            }
 
             await Task.Run(() => File.WriteAllBytes(outputPath, bytes));
             DashStatus.Text = $"Dashboard saved to: {outputPath}";
@@ -942,12 +937,11 @@ public partial class MainPage : ContentPage
         var widths = ComputeColumnWidths(rows);
         TableGrid.WidthRequest = widths.Sum() + 2;
 
-        if (_headerRow is null)
-        {
-            _headerRow = BuildTableRow(TemplateSpec.Headers, widths, header: true);
-            Grid.SetRow(_headerRow, 0);
-            TableGrid.Add(_headerRow);
-        }
+        if (_headerRow is not null)
+            TableGrid.Remove(_headerRow);
+        _headerRow = BuildTableRow(TemplateSpec.Headers, widths, header: true);
+        Grid.SetRow(_headerRow, 0);
+        TableGrid.Add(_headerRow);
 
         ItemsView.ItemTemplate = new DataTemplate(() =>
         {
