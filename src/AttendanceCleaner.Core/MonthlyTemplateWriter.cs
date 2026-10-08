@@ -60,12 +60,12 @@ public static class MonthlyTemplateWriter
     {
         var records = source.ToList();
         var mandatoryHolidayDates = holidays
-            .Where(entry => IsMandatoryHoliday(entry.Category))
+            .Where(entry => MonthlyTemplateSpec.IsMandatoryHoliday(entry.Category))
             .Select(entry => entry.Date)
             .Where(date => date.Year == month.Year && date.Month == month.Month)
             .ToHashSet();
         var workingSaturdayDates = holidays
-            .Where(entry => IsWorkingSaturday(entry.Category))
+            .Where(entry => MonthlyTemplateSpec.IsWorkingSaturday(entry.Category))
             .Select(entry => entry.Date)
             .Where(date => date.Year == month.Year && date.Month == month.Month)
             .ToHashSet();
@@ -99,8 +99,8 @@ public static class MonthlyTemplateWriter
                 if (creditHoliday)
                 {
                     present++;
-                    dutyTotal += 9m;
-                    total += 9m;
+                    dutyTotal += MonthlyTemplateSpec.DutyHours;
+                    total += MonthlyTemplateSpec.DutyHours;
                 }
                 else if (isPresent)
                 {
@@ -110,8 +110,7 @@ public static class MonthlyTemplateWriter
                     overtimeTotal += hours.Overtime;
                     total += hours.Duty + hours.Overtime;
                 }
-                else if (mandatoryHolidayDates.Contains(date)
-                    || IsRegularDayOff(date, workingSaturdayDates)
+                else if (IsRegularDayOff(date, workingSaturdayDates)
                     || IsLeaveStatus(status))
                 {
                     leave++;
@@ -183,10 +182,10 @@ public static class MonthlyTemplateWriter
         var titleColumn = 4 + daysInMonth * 2 + 6;
 
         using var workbook = new XLWorkbook();
-        var attendance = workbook.Worksheets.Add("Attendance");
-        WriteAttendanceSheet(attendance, records, employees, summaryByEmployee, holidays,
+        var attendance = workbook.Worksheets.Add(TemplateSpec.SheetName);
+        WriteAttendanceSheet(attendance, employees, summaryByEmployee, holidays,
             month, daysInMonth, kind, titleColumn);
-        WriteHolidaySheet(workbook.Worksheets.Add("Holiday Details"), holidays, month);
+        WriteHolidaySheet(workbook.Worksheets.Add(MonthlyTemplateSpec.HolidaySheetName), holidays, month);
         workbook.SaveAs(output);
     }
 
@@ -219,42 +218,42 @@ public static class MonthlyTemplateWriter
                 mergedAnchors[(rangeFirstRow, rangeFirstColumn)] =
                     (rangeLastRow - rangeFirstRow + 1, rangeLastColumn - rangeFirstColumn + 1);
                 for (var row = rangeFirstRow; row <= rangeLastRow; row++)
-                for (var column = rangeFirstColumn; column <= rangeLastColumn; column++)
-                {
-                    if (row != rangeFirstRow || column != rangeFirstColumn)
-                        mergedCells.Add((row, column));
-                }
+                    for (var column = rangeFirstColumn; column <= rangeLastColumn; column++)
+                    {
+                        if (row != rangeFirstRow || column != rangeFirstColumn)
+                            mergedCells.Add((row, column));
+                    }
             }
 
             var cells = new List<MonthlyPreviewCell>(rowCount * columnCount);
             for (var row = firstRow; row <= lastRow; row++)
-            for (var column = firstColumn; column <= lastColumn; column++)
-            {
-                if (mergedCells.Contains((row, column)))
-                    continue;
+                for (var column = firstColumn; column <= lastColumn; column++)
+                {
+                    if (mergedCells.Contains((row, column)))
+                        continue;
 
-                var cell = worksheet.Cell(row, column);
-                var fillColor = cell.Style.Fill.PatternType == XLFillPatternValues.None
-                    ? null
-                    : ToHtmlColor(cell.Style.Fill.BackgroundColor.Color);
-                var textColor = cell.Style.Font.FontColor.Color.A == 0
-                    ? null
-                    : ToHtmlColor(cell.Style.Font.FontColor.Color);
-                var span = mergedAnchors.GetValueOrDefault((row, column), (RowSpan: 1, ColumnSpan: 1));
-                cells.Add(new MonthlyPreviewCell(
-                    row - firstRow + 1,
-                    column - firstColumn + 1,
-                    span.RowSpan,
-                    span.ColumnSpan,
-                    cell.GetFormattedString(CultureInfo.InvariantCulture),
-                    fillColor,
-                    textColor,
-                    cell.Style.Font.Bold,
-                    cell.Style.Font.FontSize,
-                    cell.Style.Alignment.Horizontal.ToString(),
-                    cell.Style.Alignment.Vertical.ToString(),
-                    cell.Style.Alignment.WrapText));
-            }
+                    var cell = worksheet.Cell(row, column);
+                    var fillColor = cell.Style.Fill.PatternType == XLFillPatternValues.None
+                        ? null
+                        : ToHtmlColor(cell.Style.Fill.BackgroundColor.Color);
+                    var textColor = cell.Style.Font.FontColor.Color.A == 0
+                        ? null
+                        : ToHtmlColor(cell.Style.Font.FontColor.Color);
+                    var span = mergedAnchors.GetValueOrDefault((row, column), (RowSpan: 1, ColumnSpan: 1));
+                    cells.Add(new MonthlyPreviewCell(
+                        row - firstRow + 1,
+                        column - firstColumn + 1,
+                        span.RowSpan,
+                        span.ColumnSpan,
+                        cell.GetFormattedString(CultureInfo.InvariantCulture),
+                        fillColor,
+                        textColor,
+                        cell.Style.Font.Bold,
+                        cell.Style.Font.FontSize,
+                        cell.Style.Alignment.Horizontal.ToString(),
+                        cell.Style.Alignment.Vertical.ToString(),
+                        cell.Style.Alignment.WrapText));
+                }
 
             sheets.Add(new MonthlySheetPreview(
                 worksheet.Name,
@@ -273,9 +272,8 @@ public static class MonthlyTemplateWriter
 
     private static void WriteAttendanceSheet(
         IXLWorksheet ws,
-        IReadOnlyList<AttendanceRecord> records,
         IReadOnlyList<EmployeeGroup> employees,
-        IReadOnlyDictionary<string, MonthlyEmployeeSummary> summaries,
+        IReadOnlyDictionary<(string Id, string Name), MonthlyEmployeeSummary> summaries,
         IReadOnlyCollection<HolidayEntry> holidays,
         DateOnly month,
         int daysInMonth,
@@ -284,9 +282,9 @@ public static class MonthlyTemplateWriter
     {
         var finalDayColumn = 4 + daysInMonth * 2;
         var summaryStart = finalDayColumn + 1;
-        var title = $"DAKSHINAK MINERAL  LLP/- Employee Attendance Sheet For Month - {month.ToString("MMMM-yyyy", CultureInfo.InvariantCulture)}";
+        var title = $"{MonthlyTemplateSpec.CompanyName}- Employee Attendance Sheet For Month - {month.ToString("MMMM-yyyy", CultureInfo.InvariantCulture)}";
         ws.Range(1, 2, 1, lastColumn).Merge().Value = title;
-        ws.Range(2, 1, 2, lastColumn).Merge().Value = "Staffs";
+        ws.Range(2, 1, 2, lastColumn).Merge().Value = MonthlyTemplateSpec.StaffLabel;
         AddTemplateLogo(ws);
 
         // Fixed employee columns. The supplied Designation column is intentionally omitted.
@@ -299,7 +297,7 @@ public static class MonthlyTemplateWriter
         var holidaysByDate = holidays.Where(entry => entry.Date.Year == month.Year && entry.Date.Month == month.Month)
             .GroupBy(entry => entry.Date).ToDictionary(group => group.Key, group => group.ToList());
         var mandatoryHolidayDates = holidaysByDate
-            .Where(group => group.Value.Any(entry => IsMandatoryHoliday(entry.Category)))
+            .Where(group => group.Value.Any(entry => MonthlyTemplateSpec.IsMandatoryHoliday(entry.Category)))
             .Select(group => group.Key)
             .ToHashSet();
         for (var day = 1; day <= daysInMonth; day++)
@@ -322,8 +320,8 @@ public static class MonthlyTemplateWriter
         {
             var hoursGroup = ws.Range(HeaderFirstRow, summaryStart, HeaderFirstRow, summaryStart + 1);
             hoursGroup.Merge().Value = "No.Of.Hrs";
-            ws.Cell(HeaderFirstRow + 1, summaryStart).Value = "Duty (7am–4pm)";
-            ws.Cell(HeaderFirstRow + 1, summaryStart + 1).Value = "OT (4pm–7pm)";
+            ws.Cell(HeaderFirstRow + 1, summaryStart).Value = MonthlyTemplateSpec.DutyLabel;
+            ws.Cell(HeaderFirstRow + 1, summaryStart + 1).Value = MonthlyTemplateSpec.OvertimeLabel;
             ws.Range(HeaderFirstRow + 1, summaryStart, HeaderFirstRow + 2, summaryStart).Merge();
             ws.Range(HeaderFirstRow + 1, summaryStart + 1, HeaderFirstRow + 2, summaryStart + 1).Merge();
             WriteDayCountHeaders(ws, summaryStart + 2);
@@ -349,7 +347,7 @@ public static class MonthlyTemplateWriter
             var rowNumber = FirstDataRow + index;
             var (employee, byDate, summary) = rows[index];
             ws.Cell(rowNumber, 1).Value = index + 1;
-            WriteId(ws.Cell(rowNumber, 3), employee.Id);
+            ws.Cell(rowNumber, 3).Value = SpreadsheetValues.EmployeeId(employee.Id);
             ws.Cell(rowNumber, 2).Value = employee.Name;
             ws.Cell(rowNumber, 4).Value = summary.ScheduledWorkdays;
 
@@ -361,13 +359,13 @@ public static class MonthlyTemplateWriter
                 var creditHoliday = mandatoryHolidayDates.Contains(date);
                 if (creditHoliday && kind == MonthlyTemplateKind.DutyAndOvertime)
                 {
-                    ws.Cell(rowNumber, firstCol).Value = 9m;
+                    ws.Cell(rowNumber, firstCol).Value = MonthlyTemplateSpec.DutyHours;
                     ws.Cell(rowNumber, firstCol + 1).Value = 0m;
                 }
                 else if (creditHoliday)
                 {
-                    ws.Cell(rowNumber, firstCol).Value = "07:00";
-                    ws.Cell(rowNumber, firstCol + 1).Value = "16:00";
+                    ws.Cell(rowNumber, firstCol).Value = MonthlyTemplateSpec.DutyStart.ToString(TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
+                    ws.Cell(rowNumber, firstCol + 1).Value = MonthlyTemplateSpec.DutyEnd.ToString(TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
                 }
                 else if (kind == MonthlyTemplateKind.DutyAndOvertime)
                 {
@@ -535,7 +533,7 @@ public static class MonthlyTemplateWriter
     private static void WriteHolidaySheet(IXLWorksheet ws, IReadOnlyCollection<HolidayEntry> holidays, DateOnly month)
     {
         var entries = HolidayCalendarStore.Sort(holidays);
-        ws.Range(1, 1, 1, 3).Merge().Value = $"Holiday Details · {month.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
+        ws.Range(1, 1, 1, 3).Merge().Value = $"{MonthlyTemplateSpec.HolidaySheetName} · {month.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
         for (var col = 0; col < HolidayHeaders.Length; col++) ws.Cell(3, col + 1).Value = HolidayHeaders[col];
         for (var index = 0; index < entries.Count; index++)
         {
@@ -577,27 +575,20 @@ public static class MonthlyTemplateWriter
             .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    private static string EmployeeKey(string id, string name) => $"{id}\u001f{name}";
+    private static (string Id, string Name) EmployeeKey(string id, string name) => (id, name);
 
     private static bool IsPresent(AttendanceRecord? record)
     {
         if (record is null) return false;
         if (record.InPunch is not null || record.OutPunch is not null) return true;
         if (record.Status?.Trim().StartsWith("P", StringComparison.OrdinalIgnoreCase) == true) return true;
-        return TryParseHours(record.Attended, out var attended) && attended > 0;
+        return AttendanceTime.TryParseHours(record.Attended, out var attended) && attended > 0;
     }
 
     private static bool IsLeaveStatus(string status) =>
         status.StartsWith("W", StringComparison.OrdinalIgnoreCase)
         || status.StartsWith("L", StringComparison.OrdinalIgnoreCase)
         || status.StartsWith("H", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsMandatoryHoliday(string category) =>
-        category.Equals("Corporate Office", StringComparison.OrdinalIgnoreCase)
-        || category.Equals("Tamil Nadu", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsWorkingSaturday(string category) =>
-        category.StartsWith("Working Saturday", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsRegularDayOff(DateOnly date, IReadOnlySet<DateOnly> workingSaturdayDates) =>
         date.DayOfWeek == DayOfWeek.Sunday
@@ -612,67 +603,35 @@ public static class MonthlyTemplateWriter
 
     private static (decimal Duty, decimal Overtime) CalculateHours(AttendanceRecord record)
     {
-        var hasAttended = TryParseHours(record.Attended, out var attended) && attended > 0;
+        var hasAttended = AttendanceTime.TryParseHours(record.Attended, out var attended) && attended > 0;
         var punchTotal = GetPunchDurationHours(record.InPunch, record.OutPunch);
         var total = hasAttended ? attended : punchTotal;
-        var reportedOvertime = TryParseHours(record.Overtime, out var reported) && reported > 0 ? reported : 0;
-        var punchOvertime = GetPunchWindowHours(record, 16, 19);
-        var overtime = Math.Min(3m, reportedOvertime > 0 ? reportedOvertime : punchOvertime);
-        if (overtime == 0 && total > 9) overtime = Math.Min(3m, total - 9m);
-        var duty = Math.Min(9m, Math.Max(0, total - overtime));
+        var reportedOvertime = AttendanceTime.TryParseHours(record.Overtime, out var reported) && reported > 0 ? reported : 0;
+        var punchOvertime = GetPunchWindowHours(record, MonthlyTemplateSpec.DutyEnd, MonthlyTemplateSpec.OvertimeEnd);
+        var overtime = Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours, reportedOvertime > 0 ? reportedOvertime : punchOvertime);
+        if (overtime == 0 && total > MonthlyTemplateSpec.DutyHours) overtime = Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours, total - MonthlyTemplateSpec.DutyHours);
+        var duty = Math.Min(MonthlyTemplateSpec.DutyHours, Math.Max(0, total - overtime));
         return (decimal.Round(duty, 2), decimal.Round(overtime, 2));
     }
 
     private static decimal GetPunchDurationHours(string? inPunch, string? outPunch)
     {
-        if (!TryParsePunch(inPunch, out var start) || !TryParsePunch(outPunch, out var end)) return 0;
-        var minutes = (int)(end - start).TotalMinutes;
-        if (minutes < 0) minutes += 24 * 60;
-        return minutes / 60m;
+        return (AttendanceTime.PunchDurationMinutes(inPunch, outPunch) ?? 0) / 60m;
     }
 
-    private static decimal GetPunchWindowHours(AttendanceRecord record, int fromHour, int toHour)
+    private static decimal GetPunchWindowHours(AttendanceRecord record, TimeOnly fromTime, TimeOnly toTime)
     {
-        if (!TryParsePunch(record.InPunch, out var inTime) || !TryParsePunch(record.OutPunch, out var outTime)) return 0;
+        if (!AttendanceTime.TryParsePunch(record.InPunch, out var inTime) || !AttendanceTime.TryParsePunch(record.OutPunch, out var outTime)) return 0;
         var date = record.Date.ToDateTime(TimeOnly.MinValue);
         var start = date.Add(inTime.ToTimeSpan());
         var end = date.Add(outTime.ToTimeSpan());
-        if (end <= start) end = end.AddDays(1);
-        var windowStart = date.AddHours(fromHour);
-        var windowEnd = date.AddHours(toHour);
+        if (end < start) end = end.AddDays(1);
+        var windowStart = date.Add(fromTime.ToTimeSpan());
+        var windowEnd = date.Add(toTime.ToTimeSpan());
         var overlapStart = start > windowStart ? start : windowStart;
         var overlapEnd = end < windowEnd ? end : windowEnd;
         var overlap = Math.Max(0, (int)(overlapEnd - overlapStart).TotalMinutes);
         return overlap / 60m;
-    }
-
-    private static bool TryParsePunch(string? value, out TimeOnly time) =>
-        TimeOnly.TryParseExact(value, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out time);
-
-    private static bool TryParseHours(string? raw, out decimal hours)
-    {
-        raw = raw?.Trim();
-        if (!string.IsNullOrEmpty(raw) && raw != "-")
-        {
-            if (raw.Contains(':') && TimeSpan.TryParse(raw, CultureInfo.InvariantCulture, out var span))
-            {
-                hours = (decimal)span.TotalHours;
-                return true;
-            }
-            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out hours))
-                return true;
-        }
-        hours = 0;
-        return false;
-    }
-
-    private static void WriteId(IXLCell cell, string value)
-    {
-        var keepsLeadingZeros = value.Length > 1 && value[0] == '0' && value.All(char.IsDigit);
-        if (!keepsLeadingZeros && long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var id))
-            cell.Value = id;
-        else
-            cell.Value = value;
     }
 
     private sealed record EmployeeGroup(string Id, string Name, int Order, List<AttendanceRecord> Records);

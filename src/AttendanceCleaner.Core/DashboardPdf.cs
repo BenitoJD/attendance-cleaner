@@ -1,7 +1,6 @@
 using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
-using QuestPDF.Drawing;
 using QuestPDF.Infrastructure;
 
 namespace AttendanceCleaner.Core;
@@ -14,23 +13,22 @@ namespace AttendanceCleaner.Core;
 public static class DashboardPdf
 {
     private const string FontResourceName = "AttendanceCleaner.Core.OpenSans.ttf";
-    private static bool _fontRegistered;
+    private static readonly Lazy<bool> FontRegistration = new(RegisterFont);
 
-    private static void EnsureFont()
+    private static bool RegisterFont()
     {
-        if (_fontRegistered) return;
         var assembly = typeof(DashboardPdf).Assembly;
         using var stream = assembly.GetManifestResourceStream(FontResourceName)
             ?? throw new InvalidOperationException(
-                $"Embedded font '{FontResourceName}' is missing. Both the app and test projects must embed OpenSans-Regular.ttf with this LogicalName.");
+                $"Embedded font '{FontResourceName}' is missing. The core library must embed OpenSans-Regular.ttf with this LogicalName.");
         QuestPDF.Drawing.FontManager.RegisterFontFromStream(stream);
-        _fontRegistered = true;
+        return true;
     }
 
     public static byte[] Build(Dashboard d, string sourceFileName)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        EnsureFont();
+        _ = FontRegistration.Value;
 
         return Document.Create(container =>
         {

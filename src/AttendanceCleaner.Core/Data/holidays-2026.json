@@ -1,0 +1,162 @@
+[
+  {
+    "Date": "2026-01-01",
+    "Name": "New Year Day",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-01-14",
+    "Name": "Bhogi",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-01-15",
+    "Name": "Pongal",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-01-26",
+    "Name": "Republic Day",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-03-03",
+    "Name": "Holi",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-03-19",
+    "Name": "Ugadi",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-05-01",
+    "Name": "Labour Day / May Day",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-06-02",
+    "Name": "Telangana Formation Day",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-08-15",
+    "Name": "Independence Day",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-09-14",
+    "Name": "Vinayak Chaturthi",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-10-02",
+    "Name": "Gandhi Jayanti",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-10-20",
+    "Name": "Dusherra",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-10-21",
+    "Name": "Following Day of Duesherra",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-11-09",
+    "Name": "Deepavali",
+    "Category": "Corporate Office"
+  },
+  {
+    "Date": "2026-01-01",
+    "Name": "New Year Day",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-01-14",
+    "Name": "Thai Pongal",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-01-15",
+    "Name": "Mattu Pongal",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-01-26",
+    "Name": "Republic Day",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-05-01",
+    "Name": "Labour Day / May Day",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-08-15",
+    "Name": "Independence Day",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-09-14",
+    "Name": "Vinayak Chaturthi",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-10-02",
+    "Name": "Gandhi Jayanti",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-10-19",
+    "Name": "Ayudha Puja",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-10-20",
+    "Name": "Vijaya Dasami",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-11-09",
+    "Name": "Deepavali",
+    "Category": "Tamil Nadu"
+  },
+  {
+    "Date": "2026-03-21",
+    "Name": "Ramzan",
+    "Category": "Optional · Corporate Office"
+  },
+  {
+    "Date": "2026-04-03",
+    "Name": "Good Friday",
+    "Category": "Optional · Corporate Office"
+  },
+  {
+    "Date": "2026-12-25",
+    "Name": "Christmas",
+    "Category": "Optional · Corporate Office"
+  },
+  {
+    "Date": "2026-05-27",
+    "Name": "Bakird",
+    "Category": "Optional · Tamil Nadu"
+  },
+  {
+    "Date": "2026-12-25",
+    "Name": "Christmas",
+    "Category": "Optional · Tamil Nadu"
+  },
+  {
+    "Date": "2026-01-31",
+    "Name": "Working Day",
+    "Category": "Working Saturday · Corporate Office"
+  },
+  {
+    "Date": "2026-10-24",
+    "Name": "Working Day",
+    "Category": "Working Saturday · Corporate Office"
+  }
+]

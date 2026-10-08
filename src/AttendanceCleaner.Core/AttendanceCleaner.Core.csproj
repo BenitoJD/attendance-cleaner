@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="TargetFrameworks">
+  <PropertyGroup>
+    <!-- Platform publish commands override TargetFrameworks for the app only. -->
+    <TargetFrameworks />
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="HtmlAgilityPack" />
+    <PackageReference Include="QuestPDF" />
+    <EmbeddedResource Include="../AttendanceCleaner/Resources/Fonts/OpenSans-Regular.ttf" LogicalName="AttendanceCleaner.Core.OpenSans.ttf" />
+    <EmbeddedResource Include="../AttendanceCleaner/Assets/dakshinak-template-logo.png" LogicalName="AttendanceCleaner.Core.DakshinakTemplateLogo.png" />
+    <EmbeddedResource Include="Data/holidays-2026.json" LogicalName="AttendanceCleaner.Core.Holidays2026.json" />
+  </ItemGroup>
+</Project>

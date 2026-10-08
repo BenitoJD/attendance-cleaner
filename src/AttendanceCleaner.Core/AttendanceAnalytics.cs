@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace AttendanceCleaner.Core;
 
 /// <summary>One employee's attendance summary for the dashboard.</summary>
@@ -81,7 +79,7 @@ public static class AttendanceAnalytics
                     AveragePunch(g, r => r.InPunch),
                     AveragePunch(g, r => r.OutPunch),
                     AverageHours(g),
-                    g.Count() == 0 ? 0 : 100.0 * empPresent / g.Count());
+                    100.0 * empPresent / g.Count());
             })
             .ToList();
 
@@ -106,28 +104,24 @@ public static class AttendanceAnalytics
     private static string? AveragePunch(IEnumerable<AttendanceRecord> rows, Func<AttendanceRecord, string?> punch)
     {
         var minutes = rows.Select(punch).Where(p => p != null)
-            .Select(p => TimeOnly.ParseExact(p!, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture))
+            .Select(p => AttendanceTime.TryParsePunch(p, out var time)
+                ? time : throw new FormatException($"Invalid normalized punch: {p}"))
             .Select(t => t.Hour * 60 + t.Minute)
             .ToList();
         if (minutes.Count == 0) return null;
         var avg = (int)Math.Round(minutes.Average());
-        return $"{avg / 60:00}:{avg % 60:00}";
+        return AttendanceTime.FormatMinutes(avg);
     }
 
     /// <summary>Average worked hours as "HH:mm" (over fully present rows only).</summary>
     private static string? AverageHours(IEnumerable<AttendanceRecord> rows)
     {
         var spans = rows.Where(r => r.InPunch != null && r.OutPunch != null)
-            .Select(r =>
-            {
-                var tin = TimeOnly.ParseExact(r.InPunch!, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
-                var tout = TimeOnly.ParseExact(r.OutPunch!, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
-                var m = (int)(tout - tin).TotalMinutes;
-                return m < 0 ? m + 24 * 60 : m;
-            })
+            .Select(r => AttendanceTime.PunchDurationMinutes(r.InPunch, r.OutPunch)
+                ?? throw new FormatException("Invalid normalized attendance punches."))
             .ToList();
         if (spans.Count == 0) return null;
         var avg = (int)Math.Round(spans.Average());
-        return $"{avg / 60:00}:{avg % 60:00}";
+        return AttendanceTime.FormatMinutes(avg);
     }
 }

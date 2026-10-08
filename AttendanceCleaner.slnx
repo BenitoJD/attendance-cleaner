@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AttendanceCleaner/AttendanceCleaner.csproj" />
+    <Project Path="src/AttendanceCleaner.Core/AttendanceCleaner.Core.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ConverterCli/ConverterCli.csproj" />
+    <Project Path="tools/AttendanceCleaner.Tests/AttendanceCleaner.Tests.csproj" />
   </Folder>
 </Solution>

@@ -6,7 +6,9 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'tools/installer/**'
+      - 'tools/**'
+      - 'Directory.*.props'
+      - 'AttendanceCleaner.slnx'
       - '.github/workflows/windows-build.yml'
 
 jobs:

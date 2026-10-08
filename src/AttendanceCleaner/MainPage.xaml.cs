@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.ObjectModel;
 using System.Text;
 using AttendanceCleaner.Core;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
@@ -20,7 +21,9 @@ public partial class MainPage : ContentPage
     private string _outputDirectory = "";
     private ReportCategory? _selectedCategory;
     private MonthlyTemplateKind? _selectedMonthlyTemplate;
-    private List<HolidayEntry> _holidayEntries = new();
+    private ObservableCollection<HolidayEntry> _holidayEntries = new();
+    private bool _holidaysLoaded;
+    private bool _holidayOperationInProgress;
     private IDispatcherTimer? _istTimer;
     private DateTimeOffset _nextIstSyncUtc = DateTimeOffset.MinValue;
     private bool _istSyncInProgress;
@@ -35,7 +38,7 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
-        using (var logoStream = typeof(MainPage).Assembly
+        using (var logoStream = typeof(MonthlyTemplateWriter).Assembly
             .GetManifestResourceStream("AttendanceCleaner.Core.DakshinakTemplateLogo.png"))
         {
             if (logoStream is not null)
@@ -125,8 +128,6 @@ public partial class MainPage : ContentPage
                 BuildTable(_convertedRows ?? Array.Empty<TemplateRow>());
             if (_dashboard is not null)
                 BuildDashboard();
-            if (HolidayManagerCard.IsVisible)
-                RenderHolidayRows();
 
             if (DashboardSection.IsVisible)
                 ShowDashboardTab();
@@ -224,182 +225,161 @@ public partial class MainPage : ContentPage
             inOutSelected ? "AccentSurfaceDark" : "SurfaceDark");
     }
 
-    private void OnManageHolidaysClicked(object? sender, EventArgs e)
+    private async void OnManageHolidaysClicked(object? sender, EventArgs e)
     {
+        if (_holidayOperationInProgress) return;
+        MonthlyOptionsPanel.IsVisible = false;
+        UploadCard.IsVisible = false;
+        ConvertSection.IsVisible = false;
+        HolidaySection.IsVisible = true;
+        HolidayManagerCard.IsVisible = true;
+        HolidayList.IsVisible = _holidaysLoaded;
+        SetHolidayBusy(true, showProgress: true);
+        HolidaySaveStatus.Text = "Loading holidays…";
         try
         {
-            _holidayEntries = _holidayCalendarStore.LoadOrSeed().ToList();
-            RenderHolidayRows();
+            if (!_holidaysLoaded)
+            {
+                var entries = await Task.Run(_holidayCalendarStore.LoadOrSeed);
+                _holidayEntries = new ObservableCollection<HolidayEntry>(entries);
+                HolidayList.ItemsSource = _holidayEntries;
+                _holidaysLoaded = true;
+                HolidayList.IsVisible = true;
+            }
             HolidaySaveStatus.Text = $"{_holidayEntries.Count} holidays saved.";
+            UpdateHolidayTableWidth();
         }
         catch (Exception ex)
         {
             HolidaySaveStatus.Text = $"Could not load the holiday calendar: {ex.Message}";
-            return;
         }
-
-        MonthlyOptionsPanel.IsVisible = false;
-        UploadCard.IsVisible = false;
-        HolidayManagerCard.IsVisible = true;
-        Dispatcher.Dispatch(() =>
+        finally
         {
-            foreach (var row in HolidayRowsLayout.Children.OfType<Grid>())
-            foreach (var cell in row.Children.OfType<Border>())
-                cell.Content?.Unfocus();
-        });
+            SetHolidayBusy(false);
+        }
     }
 
     private void OnHolidayManagerBackClicked(object? sender, EventArgs e)
     {
+        if (_holidayOperationInProgress) return;
+        HolidaySection.IsVisible = false;
         HolidayManagerCard.IsVisible = false;
+        ConvertSection.IsVisible = true;
         MonthlyOptionsPanel.IsVisible = true;
         UploadCard.IsVisible = _selectedMonthlyTemplate is not null;
     }
 
-    private void OnAddHolidayClicked(object? sender, EventArgs e)
+    protected override bool OnBackButtonPressed()
     {
-        _holidayEntries.Add(HolidayEntry.Create(DateOnly.FromDateTime(DateTime.Today), "New holiday", "Corporate Office"));
-        SaveHolidayCalendar();
-        RenderHolidayRows();
+        if (HolidayDialog.IsVisible)
+        {
+            HolidayDialog.Cancel();
+            return true;
+        }
+        if (HolidaySection.IsVisible)
+        {
+            OnHolidayManagerBackClicked(this, EventArgs.Empty);
+            return true;
+        }
+        return base.OnBackButtonPressed();
     }
 
-    private void RenderHolidayRows()
+    private async void OnAddHolidayClicked(object? sender, EventArgs e) => await EditHolidayAsync(null);
+
+    private async void OnEditHolidayClicked(object? sender, EventArgs e)
     {
-        HolidayRowsLayout.Children.Clear();
-        NoHolidayRowsLabel.IsVisible = _holidayEntries.Count == 0;
+        if (sender is BindableObject { BindingContext: HolidayEntry holiday })
+            await EditHolidayAsync(holiday);
+    }
 
-        var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
-        var borderColor = GetThemeColor(dark ? "BorderDark" : "BorderLight");
-        var rowIndex = 0;
-
-        foreach (var holiday in HolidayCalendarStore.Sort(_holidayEntries))
+    private async Task EditHolidayAsync(HolidayEntry? holiday)
+    {
+        if (_holidayOperationInProgress || !_holidaysLoaded) return;
+        SetHolidayBusy(true);
+        try
         {
-            var row = new Grid
-            {
-                ColumnDefinitions =
-                {
-                    new ColumnDefinition(new GridLength(112)),
-                    new ColumnDefinition(new GridLength(180)),
-                    new ColumnDefinition(new GridLength(170)),
-                    new ColumnDefinition(new GridLength(62)),
-                },
-                ColumnSpacing = 0,
-                HeightRequest = 48,
-            };
+            var updated = await HolidayDialog.ShowAsync(holiday,
+                DateOnly.FromDateTime(_indiaTimeClock.CurrentTime.DateTime), HolidayCategoryOptions);
+            if (updated is null) return;
 
-            var datePicker = new DatePicker
-            {
-                Date = holiday.Date.ToDateTime(TimeOnly.MinValue),
-                Format = "dd/MM/yyyy",
-                FontSize = 12,
-                HorizontalOptions = LayoutOptions.Fill,
-                VerticalOptions = LayoutOptions.Center,
-                BackgroundColor = Colors.Transparent,
-            };
-            SetThemeColor(datePicker, DatePicker.TextColorProperty, "TextBodyLight", "TextBodyDark");
+            var snapshot = HolidayCalendarStore.Sort(
+                _holidayEntries.Where(entry => entry.Id != updated.Id).Append(updated));
+            if (!await SaveHolidayCalendarAsync(snapshot)) return;
 
-            var categoryPicker = new Picker
+            var destination = snapshot.ToList().FindIndex(entry => entry.Id == updated.Id);
+            var previous = holiday is null ? -1 : _holidayEntries.IndexOf(holiday);
+            if (previous < 0)
+                _holidayEntries.Insert(destination, updated);
+            else
             {
-                Title = "Category",
-                ItemsSource = HolidayCategoryOptions.Select(option => option.Label).ToArray(),
-                SelectedIndex = Array.FindIndex(HolidayCategoryOptions,
-                    option => option.Value.Equals(holiday.Category, StringComparison.OrdinalIgnoreCase)),
-                FontSize = 11,
-                HorizontalOptions = LayoutOptions.Fill,
-                VerticalOptions = LayoutOptions.Center,
-                BackgroundColor = Colors.Transparent,
-            };
-            SetThemeColor(categoryPicker, Picker.TextColorProperty, "TextBodyLight", "TextBodyDark");
-
-            var nameEntry = new Entry
-            {
-                Text = holiday.Name,
-                Placeholder = "Holiday name",
-                FontSize = 13,
-                HorizontalOptions = LayoutOptions.Fill,
-                VerticalOptions = LayoutOptions.Center,
-                BackgroundColor = Colors.Transparent,
-            };
-            SetThemeColor(nameEntry, Entry.TextColorProperty, "TextBodyLight", "TextBodyDark");
-            SetThemeColor(nameEntry, Entry.PlaceholderColorProperty, "TextSecondaryLight", "TextSecondaryDark");
-
-            var removeButton = new Button
-            {
-                Text = "Delete",
-                FontSize = 10,
-                Padding = new Thickness(2, 0),
-                CornerRadius = 0,
-                BackgroundColor = Colors.Transparent,
-                TextColor = GetThemeColor("DangerLight"),
-                HorizontalOptions = LayoutOptions.Fill,
-                VerticalOptions = LayoutOptions.Fill,
-            };
-            SetThemeColor(removeButton, Button.TextColorProperty, "DangerLight", "DangerDark");
-            SemanticProperties.SetDescription(removeButton, $"Delete {holiday.Name}");
-
-            Border Cell(View content)
-            {
-                var cell = new Border
-                {
-                    Stroke = new SolidColorBrush(borderColor),
-                    StrokeThickness = 0.75,
-                    Padding = new Thickness(4, 2),
-                    Content = content,
-                };
-                SetThemeColor(cell, Border.BackgroundColorProperty,
-                    rowIndex % 2 == 0 ? "SurfaceLight" : "SurfaceAltLight",
-                    rowIndex % 2 == 0 ? "SurfaceDark" : "SurfaceAltDark");
-                return cell;
+                _holidayEntries[previous] = updated;
+                if (previous != destination) _holidayEntries.Move(previous, destination);
             }
-
-            row.Add(Cell(datePicker), 0);
-            row.Add(Cell(nameEntry), 1);
-            row.Add(Cell(categoryPicker), 2);
-            row.Add(Cell(removeButton), 3);
-
-            datePicker.DateSelected += (_, args) =>
-            {
-                if (args.NewDate.HasValue)
-                    UpdateHoliday(holiday.Id, entry => entry with { Date = DateOnly.FromDateTime(args.NewDate.Value) });
-            };
-            categoryPicker.SelectedIndexChanged += (_, _) =>
-            {
-                if (categoryPicker.SelectedIndex >= 0)
-                {
-                    var category = HolidayCategoryOptions[categoryPicker.SelectedIndex].Value;
-                    UpdateHoliday(holiday.Id, entry => entry with { Category = category });
-                }
-            };
-            nameEntry.TextChanged += (_, args) => UpdateHoliday(holiday.Id, entry => entry with { Name = args.NewTextValue ?? "" });
-            removeButton.Clicked += (_, _) =>
-            {
-                _holidayEntries.RemoveAll(entry => entry.Id == holiday.Id);
-                SaveHolidayCalendar();
-                RenderHolidayRows();
-            };
-            HolidayRowsLayout.Children.Add(row);
-            rowIndex++;
+        }
+        finally
+        {
+            SetHolidayBusy(false);
         }
     }
 
-    private void UpdateHoliday(string id, Func<HolidayEntry, HolidayEntry> update)
+    private async void OnDeleteHolidayClicked(object? sender, EventArgs e)
     {
-        var index = _holidayEntries.FindIndex(entry => entry.Id == id);
-        if (index < 0) return;
-        _holidayEntries[index] = update(_holidayEntries[index]);
-        SaveHolidayCalendar();
-    }
-
-    private void SaveHolidayCalendar()
-    {
+        if (_holidayOperationInProgress || sender is not BindableObject { BindingContext: HolidayEntry holiday }) return;
+        SetHolidayBusy(true);
         try
         {
-            _holidayCalendarStore.Save(_holidayEntries);
-            HolidaySaveStatus.Text = $"Saved · {_holidayEntries.Count} holidays";
+            var confirmed = await DisplayAlertAsync("Delete holiday?",
+                $"Delete “{holiday.Name}” on {holiday.Date:dd MMM yyyy}? This will remove it from your holiday calendar.",
+                "Delete", "Cancel");
+            if (!confirmed) return;
+
+            var snapshot = _holidayEntries.Where(entry => entry.Id != holiday.Id).ToArray();
+            if (await SaveHolidayCalendarAsync(snapshot))
+                _holidayEntries.Remove(holiday);
+        }
+        finally
+        {
+            SetHolidayBusy(false);
+        }
+    }
+
+    private async Task<bool> SaveHolidayCalendarAsync(IReadOnlyCollection<HolidayEntry> entries)
+    {
+        SetHolidayBusy(true, showProgress: true);
+        HolidaySaveStatus.Text = "Saving…";
+        try
+        {
+            await Task.Run(() => _holidayCalendarStore.Save(entries));
+            HolidaySaveStatus.Text = $"Saved · {entries.Count} holidays";
+            return true;
         }
         catch (Exception ex)
         {
             HolidaySaveStatus.Text = $"Could not save the holiday calendar: {ex.Message}";
+            await DisplayAlertAsync("Could not save holiday", ex.Message, "OK");
+            return false;
+        }
+    }
+
+    private void SetHolidayBusy(bool busy, bool showProgress = false)
+    {
+        _holidayOperationInProgress = busy;
+        AddHolidayButton.IsEnabled = !busy && _holidaysLoaded;
+        HolidayBackButton.IsEnabled = !busy;
+        HolidayList.IsEnabled = !busy && _holidaysLoaded;
+        HolidayBusyIndicator.IsRunning = busy && showProgress;
+        HolidayBusyIndicator.IsVisible = busy && showProgress;
+    }
+
+    private void OnHolidayTableSizeChanged(object? sender, EventArgs e) => UpdateHolidayTableWidth();
+
+    private void UpdateHolidayTableWidth()
+    {
+        if (HolidayTableScroll.Width > 0)
+        {
+            var width = Math.Max(HolidayTableLayout.MinimumWidthRequest, HolidayTableScroll.Width);
+            if (Math.Abs(HolidayTableLayout.WidthRequest - width) > 0.5)
+                HolidayTableLayout.WidthRequest = width;
         }
     }
 
@@ -416,11 +396,11 @@ public partial class MainPage : ContentPage
 
     private static readonly (string Label, string Value)[] HolidayCategoryOptions =
     {
-        ("Corporate office", "Corporate Office"),
-        ("Tamil Nadu", "Tamil Nadu"),
-        ("Optional · corporate", "Optional · Corporate Office"),
-        ("Optional · Tamil Nadu", "Optional · Tamil Nadu"),
-        ("Working Saturday", "Working Saturday · Corporate Office"),
+        ("Corporate office", MonthlyTemplateSpec.CorporateOfficeCategory),
+        ("Tamil Nadu", MonthlyTemplateSpec.TamilNaduCategory),
+        ("Optional · corporate", MonthlyTemplateSpec.OptionalCorporateCategory),
+        ("Optional · Tamil Nadu", MonthlyTemplateSpec.OptionalTamilNaduCategory),
+        ("Working Saturday", MonthlyTemplateSpec.WorkingSaturdayCategory),
     };
 
     private void UpdateTemplateCardSelection()

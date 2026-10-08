@@ -69,7 +69,7 @@ The Windows target (`net10.0-windows10.0.19041.0`) only builds on Windows — us
 
 ### Core logic without the UI
 
-`tools/ConverterCli` is a console harness around the same parser/writer (`src/AttendanceCleaner/Core`), handy for testing against real exports:
+`tools/ConverterCli` is a console harness around the same parser/writer (`src/AttendanceCleaner.Core`), handy for testing against real exports:
 
 ```bash
 dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.xlsx
@@ -89,7 +89,45 @@ The release workflow runs the tests, builds both setup installers and portable Z
 
 ```
 AttendanceCleaner.slnx
-src/AttendanceCleaner/    # the MAUI app (Core/ holds the parser + Excel writer)
-tools/ConverterCli/       # console harness for the core logic (not in the solution)
+src/AttendanceCleaner/    # the MAUI app
+src/AttendanceCleaner.Core/ # shared parsing, reporting, calendar, and analytics library
+tools/ConverterCli/       # console harness for the core logic
 tools/AttendanceCleaner.Tests/  # test suite, run in CI
 ```
+
+### Coding standards
+
+The app, CLI, and tests reference one shared core library. Keep MAUI and platform
+APIs in the app; put parsing, calculations, and report generation in the core.
+Package versions live in `Directory.Packages.props`; nullable checks and .NET
+analyzers are enabled across projects by `Directory.Build.props`.
+
+Use `.editorconfig` formatting, descriptive names, and small functions with a single
+purpose. Reuse `AttendanceTime` for normalized punch/duration arithmetic and
+`SpreadsheetValues` for employee IDs. Preserve leading zeros and long identifiers.
+Keep parsing and exported values independent of the machine's culture.
+
+`TemplateSpec` defines daily layout rules. `MonthlyTemplateSpec` defines the
+supplied monthly schedule, company labels, and holiday categories; duty limits,
+shift labels, and holiday credits derive from that schedule. These are required
+business rules, so changes should include behavior tests. Holiday dates are data:
+edit `src/AttendanceCleaner.Core/Data/holidays-2026.json` for the bundled seed, or
+use the app's holiday manager for an existing calendar. The 2026 seed is explicitly
+year-specific; do not extrapolate movable holidays into other years.
+
+Keep constants for meaningful shared rules, rather than extracting every one-off
+layout value. Avoid duplicate implementations and delimiter-based composite keys.
+Register shared resources once safely when used from concurrent callers.
+
+Run these checks before submitting changes (MAUI workloads are unnecessary):
+
+```bash
+dotnet format whitespace src/AttendanceCleaner.Core/AttendanceCleaner.Core.csproj --verify-no-changes
+dotnet format whitespace tools/ConverterCli/ConverterCli.csproj --verify-no-changes
+dotnet format whitespace tools/AttendanceCleaner.Tests/AttendanceCleaner.Tests.csproj --verify-no-changes
+dotnet build tools/ConverterCli --configuration Release -warnaserror
+dotnet test tools/AttendanceCleaner.Tests --configuration Release -warnaserror
+```
+
+The `code-quality` workflow runs these checks on pull requests and pushes to main.
+Platform builds and installer checks remain in the Windows workflows.

@@ -258,24 +258,24 @@ public static partial class AttendanceParser
     private static (List<string> header, List<string> summaryHeader, List<int> dayColumns)? FindMonthlyRowsHeader(List<List<List<string>>> tables)
     {
         foreach (var table in tables)
-        for (var rowIndex = 0; rowIndex < table.Count; rowIndex++)
-        {
-            var row = table[rowIndex];
-            if (!Same(Cell(row, 0), LabelNo) || !row.Any(c => Same(c, LabelPersonId))) continue;
-            var dayColumns = new List<int>();
-            for (int c = 0; c < row.Count; c++)
+            for (var rowIndex = 0; rowIndex < table.Count; rowIndex++)
             {
-                if (int.TryParse(Cell(row, c), out var d) && d is >= 1 and <= 31)
+                var row = table[rowIndex];
+                if (!Same(Cell(row, 0), LabelNo) || !row.Any(c => Same(c, LabelPersonId))) continue;
+                var dayColumns = new List<int>();
+                for (int c = 0; c < row.Count; c++)
                 {
-                    dayColumns.Add(c);
+                    if (int.TryParse(Cell(row, c), out var d) && d is >= 1 and <= 31)
+                    {
+                        dayColumns.Add(c);
+                    }
+                }
+                if (dayColumns.Count >= 28)
+                {
+                    var summaryHeader = rowIndex + 1 < table.Count ? table[rowIndex + 1] : new List<string>();
+                    return (row, summaryHeader, dayColumns);
                 }
             }
-            if (dayColumns.Count >= 28)
-            {
-                var summaryHeader = rowIndex + 1 < table.Count ? table[rowIndex + 1] : new List<string>();
-                return (row, summaryHeader, dayColumns);
-            }
-        }
         return null;
     }
 

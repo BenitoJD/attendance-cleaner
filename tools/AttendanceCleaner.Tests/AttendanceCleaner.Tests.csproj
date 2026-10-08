@@ -2,21 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../src/AttendanceCleaner/Core/**/*.cs" />
-    <EmbeddedResource Include="../../src/AttendanceCleaner/Resources/Fonts/OpenSans-Regular.ttf" LogicalName="AttendanceCleaner.Core.OpenSans.ttf" />
-    <EmbeddedResource Include="../../src/AttendanceCleaner/Assets/dakshinak-template-logo.png" LogicalName="AttendanceCleaner.Core.DakshinakTemplateLogo.png" />
-    <PackageReference Include="ClosedXML" Version="0.105.1" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
-    <PackageReference Include="QuestPDF" Version="2026.9.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../src/AttendanceCleaner.Core/AttendanceCleaner.Core.csproj" />
+  </ItemGroup>
 </Project>

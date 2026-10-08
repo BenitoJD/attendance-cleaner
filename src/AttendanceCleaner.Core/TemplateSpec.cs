@@ -1,8 +1,8 @@
 namespace AttendanceCleaner.Core;
 
 /// <summary>
-/// Everything about the output template and the conversion rules in one place.
-/// If the template layout or the business rules ever change, change them here only.
+/// Daily output layout and conversion rules in one place.
+/// Monthly rules live in MonthlyTemplateSpec; holiday seed data lives in Data/.
 /// Nothing about specific employees, dates or months is hardcoded anywhere.
 /// </summary>
 public static class TemplateSpec

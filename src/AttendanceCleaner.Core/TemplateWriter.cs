@@ -79,11 +79,7 @@ public static class TemplateWriter
         foreach (var r in BuildRows(records))
         {
             ws.Cell(row, 1).Value = r.SlNo;
-            // IDs with leading zeros (e.g. "0013") must stay text or the zeros are lost
-            ws.Cell(row, 2).Value =
-                long.TryParse(r.IdNo, out var id) && !KeepsLeadingZeros(r.IdNo)
-                    ? XLCellValue.FromObject(id)
-                    : r.IdNo;
+            ws.Cell(row, 2).Value = SpreadsheetValues.EmployeeId(r.IdNo);
             ws.Cell(row, 3).Value = r.Name;
             ws.Cell(row, 4).Value = r.Gender;
             ws.Cell(row, 5).Value = r.DateText;
@@ -123,39 +119,17 @@ public static class TemplateWriter
 
     private static string? TotalHours(AttendanceRecord record)
     {
-        if (TryParseReportedHours(record.Attended, out var reportedMinutes))
-            return FormatMinutes(reportedMinutes);
-
-        if (record.InPunch == null || record.OutPunch == null) return null;
-        if (!TimeOnly.TryParseExact(record.InPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tin)
-            || !TimeOnly.TryParseExact(record.OutPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tout))
+        if (AttendanceTime.TryParseHours(record.Attended, out var hours) && hours > 0)
         {
-            return null;
+            // Invalid source values must not overflow the integer minute representation.
+            if (hours <= int.MaxValue / 60m)
+            {
+                var reportedMinutes = (int)decimal.Round(hours * 60m, 0, MidpointRounding.AwayFromZero);
+                if (reportedMinutes > 0) return AttendanceTime.FormatMinutes(reportedMinutes);
+            }
         }
-        var minutes = (int)(tout - tin).TotalMinutes;
-        if (minutes < 0) minutes += 24 * 60; // punches crossing midnight
-        return FormatMinutes(minutes);
+
+        var minutes = AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch);
+        return minutes is { } duration ? AttendanceTime.FormatMinutes(duration) : null;
     }
-
-    private static bool TryParseReportedHours(string? value, out int minutes)
-    {
-        minutes = 0;
-        value = value?.Trim();
-        if (string.IsNullOrEmpty(value) || value == "-") return false;
-
-        decimal hours;
-        if (value.Contains(':') && TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var span))
-            hours = (decimal)span.TotalHours;
-        else if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out hours))
-            return false;
-
-        if (hours <= 0) return false;
-        minutes = (int)decimal.Round(hours * 60m, 0, MidpointRounding.AwayFromZero);
-        return minutes > 0;
-    }
-
-    private static string FormatMinutes(int minutes) => $"{minutes / 60:00}:{minutes % 60:00}";
-
-    private static bool KeepsLeadingZeros(string id) =>
-        id.Length > 1 && id[0] == '0' && id.All(char.IsDigit);
 }

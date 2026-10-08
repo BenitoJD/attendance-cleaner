@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AttendanceCleaner.HolidayEditorDialog"
+             BackgroundColor="#80000000" SizeChanged="OnDialogSizeChanged">
+    <Grid Padding="24">
+        <Border x:Name="DialogCard" MaximumWidthRequest="520" MaximumHeightRequest="600"
+                HorizontalOptions="Center" VerticalOptions="Center" Padding="28" StrokeShape="RoundRectangle 20"
+                Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+            <ScrollView>
+                <VerticalStackLayout Spacing="24">
+                    <VerticalStackLayout Spacing="8">
+                        <Label x:Name="DialogTitle" Text="New holiday" FontSize="24" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="Enter the holiday details, then save." FontSize="14" LineBreakMode="WordWrap"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Holiday name" FontSize="14" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                        <Entry x:Name="NameEntry" Placeholder="e.g. New Year Day" FontSize="16" ReturnType="Next"
+                               SemanticProperties.Description="Holiday name" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Date" FontSize="14" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                        <DatePicker x:Name="HolidayDatePicker" Format="dd MMMM yyyy" FontSize="16"
+                                    SemanticProperties.Description="Holiday date" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Category" FontSize="14" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                        <Picker x:Name="CategoryPicker" FontSize="16" SemanticProperties.Description="Holiday category" />
+                    </VerticalStackLayout>
+                    <Label x:Name="ValidationMessage" IsVisible="False" FontSize="14" LineBreakMode="WordWrap"
+                           TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                        <Button Text="Cancel" FontSize="14" Padding="20,12" Clicked="OnCancelClicked"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}"
+                                TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                        <Button x:Name="SaveButton" Grid.Column="1" Text="Add holiday" FontSize="14" FontAttributes="Bold"
+                                Padding="20,12" Clicked="OnSaveClicked"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentView>

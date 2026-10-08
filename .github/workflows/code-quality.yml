@@ -1,0 +1,29 @@
+name: code-quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check core formatting
+        run: dotnet format whitespace src/AttendanceCleaner.Core/AttendanceCleaner.Core.csproj --verify-no-changes
+      - name: Check CLI formatting
+        run: dotnet format whitespace tools/ConverterCli/ConverterCli.csproj --verify-no-changes
+      - name: Check test formatting
+        run: dotnet format whitespace tools/AttendanceCleaner.Tests/AttendanceCleaner.Tests.csproj --verify-no-changes
+      - name: Build CLI with warnings as errors
+        run: dotnet build tools/ConverterCli --configuration Release -warnaserror
+      - name: Run regression tests with warnings as errors
+        run: dotnet test tools/AttendanceCleaner.Tests --configuration Release -warnaserror
