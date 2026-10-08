@@ -144,6 +144,56 @@ public sealed class MonthlyTemplateTests
     }
 
     [Fact]
+    public void Mandatory_holiday_uses_fixed_nine_hour_credit_even_with_source_punches()
+    {
+        var records = new[]
+        {
+            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+            new AttendanceRecord("007", "Example Employee", "-", new DateOnly(2026, 9, 14),
+                "06:45", "19:03", 1, Status: "P"),
+        };
+        var holidays = HolidayCalendarStore.Seed2026();
+        var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, holidays, Month));
+
+        Assert.Equal(1, summary.PresentDays);
+        Assert.Equal(9m, summary.TotalDutyHours);
+        Assert.Equal(0m, summary.TotalOvertimeHours);
+        Assert.Equal(9m, summary.TotalHours);
+
+        using var stream = new MemoryStream();
+        MonthlyTemplateWriter.Write(records, holidays, MonthlyTemplateKind.DutyAndOvertime, stream);
+        stream.Position = 0;
+        using var workbook = new XLWorkbook(stream);
+        var attendance = workbook.Worksheet("Attendance");
+        const int september14FirstColumn = 31;
+        Assert.Equal(9m, attendance.Cell(6, september14FirstColumn).GetValue<decimal>());
+        Assert.Equal(0m, attendance.Cell(6, september14FirstColumn + 1).GetValue<decimal>());
+    }
+
+    [Fact]
+    public void In_out_holiday_uses_fixed_nine_hour_shift_even_with_source_punches()
+    {
+        var records = new[]
+        {
+            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+            new AttendanceRecord("007", "Example Employee", "-", new DateOnly(2026, 9, 14),
+                "06:45", "19:03", 1, Status: "P"),
+        };
+        using var stream = new MemoryStream();
+
+        MonthlyTemplateWriter.Write(records, HolidayCalendarStore.Seed2026(), MonthlyTemplateKind.InAndOut, stream);
+        stream.Position = 0;
+        using var workbook = new XLWorkbook(stream);
+        var attendance = workbook.Worksheet("Attendance");
+        const int september14FirstColumn = 31;
+
+        Assert.Equal("07:00", attendance.Cell(6, september14FirstColumn).GetString());
+        Assert.Equal("16:00", attendance.Cell(6, september14FirstColumn + 1).GetString());
+        Assert.Equal(9m, attendance.Cell(6, 65).GetValue<decimal>());
+        Assert.Equal(1, attendance.Cell(6, 67).GetValue<int>());
+    }
+
+    [Fact]
     public void Optional_holiday_without_attendance_is_not_auto_credited()
     {
         var records = new[]
