@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="../../src/AttendanceCleaner/Core/**/*.cs" />
     <EmbeddedResource Include="../../src/AttendanceCleaner/Resources/Fonts/OpenSans-Regular.ttf" LogicalName="AttendanceCleaner.Core.OpenSans.ttf" />
+    <EmbeddedResource Include="../../src/AttendanceCleaner/Assets/dakshinak-template-logo.png" LogicalName="AttendanceCleaner.Core.DakshinakTemplateLogo.png" />
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
     <PackageReference Include="QuestPDF" Version="2026.9.1" />

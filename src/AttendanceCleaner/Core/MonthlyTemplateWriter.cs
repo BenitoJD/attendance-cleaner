@@ -146,11 +146,10 @@ public static class MonthlyTemplateWriter
     {
         var finalDayColumn = 4 + daysInMonth * 2;
         var summaryStart = finalDayColumn + 1;
-        var title = $"DAKSHINAK MINERAL LLP/- Employee Attendance Sheet For Month - {month.ToString("MMMM-yyyy", CultureInfo.InvariantCulture)}";
-        ws.Range(1, 1, 1, lastColumn).Merge().Value = title;
-        ws.Range(2, 1, 2, lastColumn).Merge().Value = kind == MonthlyTemplateKind.DutyAndOvertime
-            ? "Monthly Duty and Overtime Report"
-            : "Monthly IN and OUT Punch Report";
+        var title = $"DAKSHINAK MINERAL  LLP/- Employee Attendance Sheet For Month - {month.ToString("MMMM-yyyy", CultureInfo.InvariantCulture)}";
+        ws.Range(1, 2, 1, lastColumn).Merge().Value = title;
+        ws.Range(2, 1, 2, lastColumn).Merge().Value = "Staffs";
+        AddTemplateLogo(ws);
 
         // Fixed employee columns. The supplied Designation column is intentionally omitted.
         var fixedHeaders = new[] { "Sl.No", "Name", "Roll.No", "Days" };
@@ -268,42 +267,81 @@ public static class MonthlyTemplateWriter
         MonthlyTemplateKind kind)
     {
         var lastRow = Math.Max(FirstDataRow, FirstDataRow + employeeCount - 1);
-        var titleRange = ws.Range(1, 1, 1, lastColumn);
-        titleRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#164E63");
-        titleRange.Style.Font.FontColor = XLColor.White;
+        const string titleYellow = "#FFFF00";
+        const string paleYellow = "#FFF2CC";
+        const string paleGreen = "#E2EFDA";
+        const string paleBlue = "#DDEBF7";
+        const string paleOrange = "#FCE4D6";
+        const string sectionBlue = "#B4C7E7";
+
+        var titleRange = ws.Range(1, 2, 1, lastColumn);
+        titleRange.Style.Fill.BackgroundColor = XLColor.FromHtml(titleYellow);
+        titleRange.Style.Font.FontColor = XLColor.Black;
         titleRange.Style.Font.Bold = true;
-        titleRange.Style.Font.FontSize = 15;
-        titleRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        titleRange.Style.Font.FontSize = 12;
+        titleRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
         titleRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-        ws.Row(1).Height = 28;
+        ws.Cell(1, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#E2EFDA");
+        ws.Row(1).Height = 30;
 
         var subTitle = ws.Range(2, 1, 2, lastColumn);
-        subTitle.Style.Fill.BackgroundColor = XLColor.FromHtml("#ECFEFF");
-        subTitle.Style.Font.FontColor = XLColor.FromHtml("#155E75");
-        subTitle.Style.Font.Italic = true;
-        subTitle.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-        ws.Row(2).Height = 21;
+        subTitle.Style.Fill.BackgroundColor = XLColor.FromHtml(sectionBlue);
+        subTitle.Style.Font.FontColor = XLColor.Black;
+        subTitle.Style.Font.Bold = true;
+        subTitle.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        ws.Row(2).Height = 20;
 
         var headers = ws.Range(HeaderFirstRow, 1, HeaderFirstRow + 2, lastColumn);
-        headers.Style.Fill.BackgroundColor = XLColor.FromHtml("#0F766E");
-        headers.Style.Font.FontColor = XLColor.White;
+        headers.Style.Fill.BackgroundColor = XLColor.White;
+        headers.Style.Font.FontColor = XLColor.Black;
         headers.Style.Font.Bold = true;
         headers.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         headers.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         headers.Style.Alignment.WrapText = true;
         headers.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         headers.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-        ws.Rows(HeaderFirstRow, HeaderFirstRow + 2).Height = 23;
+        ws.Range(HeaderFirstRow, 1, HeaderFirstRow + 2, 4).Style.Fill.BackgroundColor = XLColor.FromHtml(paleYellow);
+        ws.Range(HeaderFirstRow, 5, HeaderFirstRow, summaryStart - 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleGreen);
+        ws.Range(HeaderFirstRow + 1, 5, HeaderFirstRow + 1, summaryStart - 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleBlue);
+        ws.Rows(HeaderFirstRow, HeaderFirstRow + 2).Height = 20;
+
+        for (var day = 0; day < daysInMonth; day++)
+        {
+            var firstCol = 5 + day * 2;
+            ws.Cell(HeaderFirstRow + 2, firstCol).Style.Fill.BackgroundColor = XLColor.FromHtml(paleYellow);
+            ws.Cell(HeaderFirstRow + 2, firstCol + 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleOrange);
+        }
+
+        if (kind == MonthlyTemplateKind.DutyAndOvertime)
+        {
+            ws.Range(HeaderFirstRow, summaryStart, HeaderFirstRow + 1, summaryStart).Style.Fill.BackgroundColor = XLColor.FromHtml(paleYellow);
+            ws.Range(HeaderFirstRow, summaryStart + 1, HeaderFirstRow + 1, summaryStart + 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleOrange);
+        }
+        else
+        {
+            ws.Range(HeaderFirstRow, summaryStart, HeaderFirstRow + 2, summaryStart + 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleYellow);
+        }
+        ws.Range(HeaderFirstRow, summaryStart + 2, HeaderFirstRow + 1, summaryStart + 4).Style.Fill.BackgroundColor = XLColor.FromHtml(paleGreen);
+        ws.Range(HeaderFirstRow + 2, summaryStart + 2, HeaderFirstRow + 2, summaryStart + 2).Style.Fill.BackgroundColor = XLColor.FromHtml(paleGreen);
+        ws.Range(HeaderFirstRow + 2, summaryStart + 3, HeaderFirstRow + 2, summaryStart + 3).Style.Fill.BackgroundColor = XLColor.FromHtml(sectionBlue);
+        ws.Range(HeaderFirstRow + 2, summaryStart + 4, HeaderFirstRow + 2, summaryStart + 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#D9D9D9");
 
         var data = ws.Range(FirstDataRow, 1, lastRow, lastColumn);
         data.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         data.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         data.Style.Border.InsideBorder = XLBorderStyleValues.Hair;
-        for (var row = FirstDataRow; row <= lastRow; row++)
+        for (var day = 0; day < daysInMonth; day++)
         {
-            if ((row - FirstDataRow) % 2 == 1)
-                ws.Range(row, 1, row, lastColumn).Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
+            var firstCol = 5 + day * 2;
+            ws.Range(FirstDataRow, firstCol, lastRow, firstCol).Style.Fill.BackgroundColor = XLColor.FromHtml(kind == MonthlyTemplateKind.DutyAndOvertime ? paleYellow : paleGreen);
+            ws.Range(FirstDataRow, firstCol + 1, lastRow, firstCol + 1).Style.Fill.BackgroundColor = XLColor.FromHtml(kind == MonthlyTemplateKind.DutyAndOvertime ? paleOrange : paleBlue);
         }
+        ws.Range(FirstDataRow, summaryStart, lastRow, summaryStart).Style.Fill.BackgroundColor = XLColor.FromHtml(paleYellow);
+        if (kind == MonthlyTemplateKind.DutyAndOvertime)
+            ws.Range(FirstDataRow, summaryStart + 1, lastRow, summaryStart + 1).Style.Fill.BackgroundColor = XLColor.FromHtml(paleOrange);
+        ws.Range(FirstDataRow, summaryStart + 2, lastRow, summaryStart + 2).Style.Fill.BackgroundColor = XLColor.FromHtml(paleGreen);
+        ws.Range(FirstDataRow, summaryStart + 3, lastRow, summaryStart + 3).Style.Fill.BackgroundColor = XLColor.FromHtml(sectionBlue);
+        ws.Range(FirstDataRow, summaryStart + 4, lastRow, summaryStart + 4).Style.Fill.BackgroundColor = XLColor.FromHtml("#D9D9D9");
 
         ws.Column(1).Width = 7;
         ws.Column(2).Width = 26;
@@ -331,7 +369,14 @@ public static class MonthlyTemplateWriter
         }
         ws.SheetView.FreezeRows(5);
         ws.SheetView.FreezeColumns(4);
-        if (employeeCount > 0) ws.Range(HeaderFirstRow, 1, lastRow, lastColumn).SetAutoFilter();
+    }
+
+    private static void AddTemplateLogo(IXLWorksheet ws)
+    {
+        using var logo = typeof(MonthlyTemplateWriter).Assembly
+            .GetManifestResourceStream("AttendanceCleaner.Core.DakshinakTemplateLogo.png");
+        if (logo is null) return;
+        ws.AddPicture(logo).MoveTo(ws.Cell(1, 1)).WithSize(47, 30);
     }
 
     private static void WriteHolidaySheet(IXLWorksheet ws, IReadOnlyCollection<HolidayEntry> holidays, DateOnly month)

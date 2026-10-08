@@ -40,12 +40,17 @@ public sealed class MonthlyTemplateTests
         var records = SampleRecords();
         var holidays = HolidayCalendarStore.Seed2026();
         using var stream = new MemoryStream();
+        Assert.NotNull(typeof(MonthlyTemplateWriter).Assembly.GetManifestResourceStream(
+            "AttendanceCleaner.Core.DakshinakTemplateLogo.png"));
 
         MonthlyTemplateWriter.Write(records, holidays, MonthlyTemplateKind.DutyAndOvertime, stream);
         stream.Position = 0;
         using var workbook = new XLWorkbook(stream);
         var attendance = workbook.Worksheet("Attendance");
 
+        Assert.Contains("DAKSHINAK MINERAL", attendance.Cell(1, 2).GetString());
+        Assert.Equal("Staffs", attendance.Cell(2, 1).GetString());
+        Assert.Single(attendance.Pictures);
         Assert.Equal("Name", attendance.Cell(3, 2).GetString());
         Assert.Equal("Roll.No", attendance.Cell(3, 3).GetString());
         Assert.Equal("Days", attendance.Cell(3, 4).GetString());

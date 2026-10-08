@@ -66,6 +66,7 @@
 
 		<!-- PDF font for the dashboard report (registered with QuestPDF at runtime) -->
 		<EmbeddedResource Include="Resources\Fonts\OpenSans-Regular.ttf" LogicalName="AttendanceCleaner.Core.OpenSans.ttf" />
+		<EmbeddedResource Include="Assets\dakshinak-template-logo.png" LogicalName="AttendanceCleaner.Core.DakshinakTemplateLogo.png" />
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
