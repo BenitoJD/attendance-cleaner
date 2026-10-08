@@ -79,9 +79,6 @@ public partial class MainPage : ContentPage
     private void OnIstTimeTapped(object? sender, TappedEventArgs e)
     {
         _use24HourIstTime = !_use24HourIstTime;
-        IstTimeFormatHintLabel.Text = _use24HourIstTime
-            ? "Tap or click clock for AM/PM time"
-            : "Tap or click clock for 24-hour time";
         UpdateIstClock();
     }
 
@@ -91,12 +88,10 @@ public partial class MainPage : ContentPage
 
         _istSyncInProgress = true;
         _nextIstSyncUtc = DateTimeOffset.UtcNow.AddMinutes(15);
-        IstTimeSourceLabel.Text = "Syncing…";
         try
         {
-            var synced = await _indiaTimeClock.SynchronizeAsync();
+            await _indiaTimeClock.SynchronizeAsync();
             UpdateIstClock();
-            IstTimeSourceLabel.Text = synced ? "Internet synced" : "Device clock · offline";
         }
         finally
         {

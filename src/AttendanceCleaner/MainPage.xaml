@@ -7,33 +7,26 @@
 
     <Grid RowDefinitions="Auto,*">
 
-        <Border Grid.Row="0" Margin="20,16,20,0"
+        <Border Grid.Row="0" Margin="20,8,20,0"
                 Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                StrokeThickness="1"
-                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                StrokeShape="RoundRectangle 18" Padding="16,12">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                    <Label Text="INDIA STANDARD TIME" FontSize="10" FontAttributes="Bold" CharacterSpacing="1"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    <Label x:Name="IstTimeLabel" Text="--:--:-- AM" FontSize="30" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                           SemanticProperties.Hint="Tap or click to switch the clock format">
-                        <Label.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnIstTimeTapped" />
-                        </Label.GestureRecognizers>
-                    </Label>
-                    <Label x:Name="IstDateLabel" Text="" FontSize="12"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    <Label x:Name="IstTimeFormatHintLabel" Text="Tap or click clock for 24-hour time" FontSize="10"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                </VerticalStackLayout>
-                <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center" HorizontalOptions="End">
-                    <Label Text="UTC +05:30" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="End"
-                           TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
-                    <Label x:Name="IstTimeSourceLabel" Text="Device clock" FontSize="10" HorizontalTextAlignment="End"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                </VerticalStackLayout>
+                StrokeThickness="0.5"
+                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceDark}}"
+                StrokeShape="RoundRectangle 12" Padding="12,6">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" HeightRequest="32">
+                <Label Text="IST" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5"
+                       VerticalTextAlignment="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                <Label x:Name="IstTimeLabel" Grid.Column="1" Text="--:--:-- AM" FontSize="18" FontAttributes="Bold"
+                       VerticalTextAlignment="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                       SemanticProperties.Hint="Tap or click to switch the clock format">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnIstTimeTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+                <Label x:Name="IstDateLabel" Grid.Column="3" Text="" FontSize="10"
+                       HorizontalTextAlignment="End" VerticalTextAlignment="Center" LineBreakMode="NoWrap"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
             </Grid>
         </Border>
 
