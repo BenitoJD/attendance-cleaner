@@ -76,7 +76,7 @@ dotnet run --project tools/ConverterCli -- "path/to/6 Daily Report.xls" output.x
 
 ## Downloads
 
-**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — every version's installers live here. Grab the latest, unzip, run `AttendanceCleaner.exe`:
+**[Releases](https://github.com/BenitoJD/attendance-cleaner/releases)** — download the ZIP for your Windows architecture, extract the whole folder, then run `AttendanceCleaner.exe` from inside it. Keep the other files beside the EXE; they contain the app's runtime dependencies.
 
 - `AttendanceCleaner-win-x64.zip` — 64-bit Windows 10 (1809+) / Windows 11 (almost every modern PC)
 - `AttendanceCleaner-win-x86.zip` — 32-bit Windows 10 (1809+); also runs on 64-bit Windows, so it's the safe pick when unsure

@@ -27,6 +27,36 @@
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
 
+    <!-- Attendance Cleaner page palette -->
+    <Color x:Key="CanvasLight">#F2F5F7</Color>
+    <Color x:Key="CanvasDark">#111827</Color>
+    <Color x:Key="SurfaceLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceDark">#1F2937</Color>
+    <Color x:Key="SurfaceAltLight">#F4F8F7</Color>
+    <Color x:Key="SurfaceAltDark">#273449</Color>
+    <Color x:Key="BorderLight">#E2E8F0</Color>
+    <Color x:Key="BorderDark">#374151</Color>
+    <Color x:Key="TextPrimaryLight">#111827</Color>
+    <Color x:Key="TextPrimaryDark">#F9FAFB</Color>
+    <Color x:Key="TextBodyLight">#374151</Color>
+    <Color x:Key="TextBodyDark">#D1D5DB</Color>
+    <Color x:Key="TextSecondaryLight">#6B7280</Color>
+    <Color x:Key="TextSecondaryDark">#9CA3AF</Color>
+    <Color x:Key="SuccessLight">#059669</Color>
+    <Color x:Key="SuccessDark">#34D399</Color>
+    <Color x:Key="AccentSurfaceLight">#D1FAE5</Color>
+    <Color x:Key="AccentSurfaceDark">#064E3B</Color>
+    <Color x:Key="AccentTextLight">#065F46</Color>
+    <Color x:Key="AccentTextDark">#A7F3D0</Color>
+    <Color x:Key="DangerLight">#DC2626</Color>
+    <Color x:Key="DangerDark">#F87171</Color>
+    <Color x:Key="WarningLight">#D97706</Color>
+    <Color x:Key="WarningDark">#FBBF24</Color>
+    <Color x:Key="DisabledSurfaceLight">#E5E7EB</Color>
+    <Color x:Key="DisabledSurfaceDark">#374151</Color>
+    <Color x:Key="DisabledTextLight">#4B5563</Color>
+    <Color x:Key="DisabledTextDark">#D1D5DB</Color>
+
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
     <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>

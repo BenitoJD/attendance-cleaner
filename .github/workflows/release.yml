@@ -70,43 +70,6 @@ jobs:
           -p:WindowsAppSDKSelfContained=true
           -o publish-x86
 
-      # single-file builds: one exe each, everything (including native libs and content) bundled
-      - name: Publish win-x64 (single file)
-        run: >
-          dotnet publish src/AttendanceCleaner
-          -c Release
-          -f net10.0-windows10.0.19041.0
-          -p:TargetFrameworks=net10.0-windows10.0.19041.0
-          -r win-x64
-          -p:WindowsPackageType=None
-          -p:SelfContained=true
-          -p:WindowsAppSDKSelfContained=true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:IncludeAllContentForSelfExtract=true
-          -o publish-sf-x64
-
-      - name: Publish win-x86 (single file)
-        run: >
-          dotnet publish src/AttendanceCleaner
-          -c Release
-          -f net10.0-windows10.0.19041.0
-          -p:TargetFrameworks=net10.0-windows10.0.19041.0
-          -r win-x86
-          -p:WindowsPackageType=None
-          -p:SelfContained=true
-          -p:WindowsAppSDKSelfContained=true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:IncludeAllContentForSelfExtract=true
-          -o publish-sf-x86
-
-      - name: Stage release files
-        shell: pwsh
-        run: |
-          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
-          Copy-Item 'publish-sf-x86/AttendanceCleaner.exe' 'AttendanceCleaner-x86.exe'
-
       # signing activates only when the Azure Trusted Signing secrets are configured
       - name: Sign folder exe x64
         if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
@@ -140,22 +103,6 @@ jobs:
           timestamp-digest: sha256
           timestamp-server: http://timestamp.acs.microsoft.com
 
-      - name: Sign single-file exes
-        if: ${{ env.AZURE_SIGNING_CONFIGURED != 'false' && env.AZURE_SIGNING_CONFIGURED != '' }}
-        uses: azure/trusted-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
-          code-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
-          files-folder: .
-          files-folder-filter: AttendanceCleaner-x64.exe,AttendanceCleaner-x86.exe
-          file-digest: sha256
-          timestamp-digest: sha256
-          timestamp-server: http://timestamp.acs.microsoft.com
-
       - name: Verify the folder build is complete
         shell: pwsh
         run: |
@@ -165,10 +112,10 @@ jobs:
           if ($runtime.Count -eq 0) { throw 'Folder build is missing the Windows App SDK runtime DLLs - it would not start on a clean PC.' }
           if ($exe.Length -gt 10MB) { throw 'Folder build exe is unexpectedly large - the single-file output leaked into it.' }
 
-      - name: Launch test single-file x64 (clean machine proof)
+      - name: Launch test folder build x64
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath 'publish-sf-x64/AttendanceCleaner.exe' -PassThru
+          $p = Start-Process -FilePath 'publish-x64/AttendanceCleaner.exe' -PassThru
           $ok = $false
           foreach ($i in 1..30) {
             Start-Sleep -Seconds 1
@@ -176,14 +123,14 @@ jobs:
             if ($p.HasExited) { break }
             if ($p.MainWindowHandle -ne 0) { $ok = $true; break }
           }
-          Write-Host "x64 single-file: started=$ok window=$($p.MainWindowHandle)"
-          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x64 single-file exe failed to start on a clean Windows machine' }
+          Write-Host "x64 folder build: started=$ok window=$($p.MainWindowHandle)"
+          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x64 folder build failed to start on a clean Windows machine' }
           Stop-Process -Id $p.Id -Force
 
-      - name: Launch test single-file x86 (clean machine proof)
+      - name: Launch test folder build x86
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath 'publish-sf-x86/AttendanceCleaner.exe' -PassThru
+          $p = Start-Process -FilePath 'publish-x86/AttendanceCleaner.exe' -PassThru
           $ok = $false
           foreach ($i in 1..30) {
             Start-Sleep -Seconds 1
@@ -191,8 +138,8 @@ jobs:
             if ($p.HasExited) { break }
             if ($p.MainWindowHandle -ne 0) { $ok = $true; break }
           }
-          Write-Host "x86 single-file: started=$ok window=$($p.MainWindowHandle)"
-          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x86 single-file exe failed to start on a clean Windows machine' }
+          Write-Host "x86 folder build: started=$ok window=$($p.MainWindowHandle)"
+          if (-not $ok) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw 'x86 folder build failed to start on a clean Windows machine' }
           Stop-Process -Id $p.Id -Force
 
       - name: Zip the folder builds
@@ -210,11 +157,9 @@ jobs:
           $notes = @"
           Attendance Cleaner $tag
 
-          Share just the exe - each one is a single file with everything inside:
-          - AttendanceCleaner-x64.exe - 64-bit Windows 10/11 (almost every modern PC)
-          - AttendanceCleaner-x86.exe - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
-
-          Download one, double-click it. No installation, no dependencies.
-          First launch may take a few extra seconds while it unpacks.
+          Download the ZIP for your Windows architecture, extract the whole folder, then run AttendanceCleaner.exe from inside it.
+          Keep the other files beside AttendanceCleaner.exe; they contain the Windows and .NET runtime dependencies.
+          - AttendanceCleaner-win-x64.zip - 64-bit Windows 10/11 (almost every modern PC)
+          - AttendanceCleaner-win-x86.zip - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-x64.exe AttendanceCleaner-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip

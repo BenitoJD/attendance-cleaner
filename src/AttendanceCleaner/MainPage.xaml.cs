@@ -8,12 +8,31 @@ public partial class MainPage : ContentPage
 {
     private FileResult? _selectedFile;
     private Dashboard? _dashboard;
+    private IReadOnlyList<TemplateRow>? _convertedRows;
     private string _sourceFileName = "";
     private string _outputDirectory = "";
 
     public MainPage()
     {
         InitializeComponent();
+        if (Application.Current is { } app)
+            app.RequestedThemeChanged += OnRequestedThemeChanged;
+    }
+
+    private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_convertedRows is not null)
+                BuildTable(_convertedRows);
+            if (_dashboard is not null)
+                BuildDashboard();
+
+            if (DashboardSection.IsVisible)
+                ShowDashboardTab();
+            else
+                ShowTableTab();
+        });
     }
 
     private async void OnPickFileClicked(object? sender, EventArgs e)
@@ -126,6 +145,7 @@ public partial class MainPage : ContentPage
             StatInOnly.Text = $"{inOnly}";
             InOnlyCard.IsVisible = inOnly > 0;
             SavedLabel.Text = $"Saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
+            _convertedRows = rows;
             BuildTable(rows);
 
             _dashboard = AttendanceAnalytics.Build(parsed.report.Records);
@@ -183,6 +203,8 @@ public partial class MainPage : ContentPage
         FileNameLabel.Text = "";
         StatusLabel.Text = "";
         ConvertBtn.IsEnabled = false;
+        _convertedRows = null;
+        _dashboard = null;
         ShowTableTab();
     }
 
@@ -197,10 +219,10 @@ public partial class MainPage : ContentPage
         TableCard.IsVisible = true;
         DashboardSection.IsVisible = false;
         SavePdfBtn.IsVisible = false;
-        TabTableBtn.BackgroundColor = Color.FromArgb("#059669");
+        TabTableBtn.BackgroundColor = GetThemeColor("SuccessLight");
         TabTableBtn.TextColor = Colors.White;
-        TabDashboardBtn.BackgroundColor = Colors.White;
-        TabDashboardBtn.TextColor = Color.FromArgb("#374151");
+        SetThemeColor(TabDashboardBtn, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+        SetThemeColor(TabDashboardBtn, Button.TextColorProperty, "TextBodyLight", "TextBodyDark");
     }
 
     private void ShowDashboardTab()
@@ -208,10 +230,10 @@ public partial class MainPage : ContentPage
         TableCard.IsVisible = false;
         DashboardSection.IsVisible = true;
         SavePdfBtn.IsVisible = true;
-        TabDashboardBtn.BackgroundColor = Color.FromArgb("#059669");
+        TabDashboardBtn.BackgroundColor = GetThemeColor("SuccessLight");
         TabDashboardBtn.TextColor = Colors.White;
-        TabTableBtn.BackgroundColor = Colors.White;
-        TabTableBtn.TextColor = Color.FromArgb("#374151");
+        SetThemeColor(TabTableBtn, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+        SetThemeColor(TabTableBtn, Button.TextColorProperty, "TextBodyLight", "TextBodyDark");
     }
 
     // --- dashboard ---
@@ -240,13 +262,14 @@ public partial class MainPage : ContentPage
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition(18));
             var column = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 0 };
-            column.Add(new BoxView
+            var presentBar = new BoxView
             {
-                Color = Color.FromArgb("#059669"),
                 HeightRequest = Math.Max(1, 100.0 * day.Present / max),
                 WidthRequest = 14,
                 HorizontalOptions = LayoutOptions.Center,
-            });
+            };
+            SetThemeColor(presentBar, BoxView.ColorProperty, "SuccessLight", "SuccessDark");
+            column.Add(presentBar);
             if (day.Absent > 0)
             {
                 column.Add(new BoxView
@@ -257,14 +280,15 @@ public partial class MainPage : ContentPage
                     HorizontalOptions = LayoutOptions.Center,
                 });
             }
-            column.Add(new Label
+            var dayLabel = new Label
             {
                 Text = day.Date.Day.ToString(CultureInfo.InvariantCulture),
                 FontSize = 8,
-                TextColor = Color.FromArgb("#6B7280"),
                 HorizontalTextAlignment = TextAlignment.Center,
                 Padding = new Thickness(0, 3, 0, 0),
-            });
+            };
+            SetThemeColor(dayLabel, Label.TextColorProperty, "TextSecondaryLight", "TextSecondaryDark");
+            column.Add(dayLabel);
             grid.Add(column, grid.ColumnDefinitions.Count - 1);
         }
         DashChartGrid.Children.Clear();
@@ -294,20 +318,30 @@ public partial class MainPage : ContentPage
 
         View RowView(string[] cells, bool header, bool alt)
         {
-            var g = new Grid { BackgroundColor = header ? Color.FromArgb("#059669") : alt ? Color.FromArgb("#F4F8F7") : Colors.White };
+            var g = new Grid();
+            if (header)
+                g.BackgroundColor = GetThemeColor("SuccessLight");
+            else
+                SetThemeColor(g, Grid.BackgroundColorProperty,
+                    alt ? "SurfaceAltLight" : "SurfaceLight",
+                    alt ? "SurfaceAltDark" : "SurfaceDark");
+
             for (var c = 0; c < headers.Length; c++)
             {
                 g.ColumnDefinitions.Add(new ColumnDefinition(widths[c]));
-                g.Add(new Label
+                var label = new Label
                 {
                     Text = cells[c],
                     FontSize = 12,
                     FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
-                    TextColor = header ? Colors.White : Color.FromArgb("#1F2937"),
+                    TextColor = header ? Colors.White : GetThemeColor("TextBodyLight"),
                     Padding = new Thickness(6, header ? 10 : 8),
                     HorizontalTextAlignment = c == 1 ? TextAlignment.Start : TextAlignment.Center,
                     VerticalTextAlignment = TextAlignment.Center,
-                }, c);
+                };
+                if (!header)
+                    SetThemeColor(label, Label.TextColorProperty, "TextBodyLight", "TextBodyDark");
+                g.Add(label, c);
             }
             return g;
         }
@@ -362,7 +396,9 @@ public partial class MainPage : ContentPage
     /// <summary>Presentation wrapper: the template row plus its zebra-stripe colour.</summary>
     private sealed record DisplayRow(TemplateRow Row, bool Alt)
     {
-        public Color RowColor => Alt ? Color.FromArgb("#F4F8F7") : Colors.White;
+        public Color RowColor => Application.Current?.RequestedTheme == AppTheme.Dark
+            ? Alt ? Color.FromArgb("#273449") : Color.FromArgb("#1F2937")
+            : Alt ? Color.FromArgb("#F4F8F7") : Colors.White;
     }
 
     /// <summary>Renders the header from the template spec and feeds the rows to the
@@ -391,12 +427,12 @@ public partial class MainPage : ContentPage
                 var label = new Label
                 {
                     FontSize = 12,
-                    TextColor = Color.FromArgb("#1F2937"),
                     Padding = new Thickness(6, 8),
                     HorizontalTextAlignment = left ? TextAlignment.Start : TextAlignment.Center,
                     LineBreakMode = LineBreakMode.NoWrap,
                     VerticalTextAlignment = TextAlignment.Center,
                 };
+                SetThemeColor(label, Label.TextColorProperty, "TextBodyLight", "TextBodyDark");
                 label.SetBinding(Label.TextProperty, $"{nameof(DisplayRow.Row)}.{nameof(TemplateRow.Cells)}[{c}]");
                 Grid.SetColumn(label, c);
                 grid.Add(label);
@@ -425,7 +461,11 @@ public partial class MainPage : ContentPage
 
     private static Grid BuildTableRow(IReadOnlyList<string> cells, double[] widths, bool header)
     {
-        var grid = new Grid { BackgroundColor = header ? Color.FromArgb("#059669") : Colors.White };
+        var grid = new Grid();
+        if (header)
+            grid.BackgroundColor = GetThemeColor("SuccessLight");
+        else
+            SetThemeColor(grid, Grid.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
 
         for (var c = 0; c < widths.Length; c++)
         {
@@ -435,7 +475,7 @@ public partial class MainPage : ContentPage
                 Text = c < cells.Count ? cells[c] : "",
                 FontSize = 12,
                 FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
-                TextColor = header ? Colors.White : Color.FromArgb("#1F2937"),
+                TextColor = header ? Colors.White : GetThemeColor("TextBodyLight"),
                 Padding = new Thickness(6, header ? 10 : 8),
                 HorizontalTextAlignment = Array.IndexOf(TemplateSpec.PreviewLeftAlignedColumns, c) >= 0
                     ? TextAlignment.Start
@@ -443,10 +483,17 @@ public partial class MainPage : ContentPage
                 LineBreakMode = LineBreakMode.NoWrap,
                 VerticalTextAlignment = TextAlignment.Center,
             };
+            if (!header)
+                SetThemeColor(label, Label.TextColorProperty, "TextBodyLight", "TextBodyDark");
             Grid.SetRow(label, 0);
             Grid.SetColumn(label, c);
             grid.Add(label);
         }
         return grid;
     }
+
+    private static Color GetThemeColor(string key) => (Color)Application.Current!.Resources[key];
+
+    private static void SetThemeColor(VisualElement view, BindableProperty property, string lightKey, string darkKey) =>
+        view.SetAppThemeColor(property, GetThemeColor(lightKey), GetThemeColor(darkKey));
 }

@@ -2,7 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AttendanceCleaner.MainPage"
-             BackgroundColor="#F2F5F7"
+             BackgroundColor="{AppThemeBinding Light={StaticResource CanvasLight}, Dark={StaticResource CanvasDark}}"
              Title="Attendance Cleaner">
 
     <Grid>
@@ -29,14 +29,14 @@
                 </Border>
 
                 <Label Text="Attendance Cleaner"
-                       FontSize="28" FontAttributes="Bold" TextColor="#111827"
+                       FontSize="28" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
                        HorizontalTextAlignment="Center" />
 
                 <Label Text="Convert the attendance software's report into a clean Excel template — right on this PC."
-                       FontSize="15" TextColor="#6B7280"
+                       FontSize="15" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                        HorizontalTextAlignment="Center" />
 
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                         StrokeShape="RoundRectangle 20" Padding="24"
                         HorizontalOptions="Fill">
                     <Border.Shadow>
@@ -49,22 +49,50 @@
                                 BackgroundColor="#059669" TextColor="White"
                                 FontSize="16" FontAttributes="Bold"
                                 CornerRadius="14" HeightRequest="52"
-                                Clicked="OnPickFileClicked" />
+                                Clicked="OnPickFileClicked">
+                            <Button.VisualStateManager.VisualStateGroups>
+                                <VisualStateGroupList>
+                                    <VisualStateGroup Name="CommonStates">
+                                        <VisualState Name="Normal" />
+                                        <VisualState Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource DisabledSurfaceLight}, Dark={StaticResource DisabledSurfaceDark}}" />
+                                                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DisabledTextLight}, Dark={StaticResource DisabledTextDark}}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateGroupList>
+                            </Button.VisualStateManager.VisualStateGroups>
+                        </Button>
 
                         <Button x:Name="ConvertBtn"
                                 Text="Convert &amp; save"
-                                BackgroundColor="#D1FAE5" TextColor="#065F46"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
                                 FontSize="16" FontAttributes="Bold"
                                 CornerRadius="14" HeightRequest="52"
                                 IsEnabled="False"
-                                Clicked="OnConvertClicked" />
+                                Clicked="OnConvertClicked">
+                            <Button.VisualStateManager.VisualStateGroups>
+                                <VisualStateGroupList>
+                                    <VisualStateGroup Name="CommonStates">
+                                        <VisualState Name="Normal" />
+                                        <VisualState Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource DisabledSurfaceLight}, Dark={StaticResource DisabledSurfaceDark}}" />
+                                                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DisabledTextLight}, Dark={StaticResource DisabledTextDark}}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateGroupList>
+                            </Button.VisualStateManager.VisualStateGroups>
+                        </Button>
 
                         <Label x:Name="FileNameLabel" Text=""
-                               FontSize="13" FontAttributes="Bold" TextColor="#374151"
+                               FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
                                HorizontalTextAlignment="Center" />
 
                         <Label x:Name="StatusLabel" Text=""
-                               FontSize="13" TextColor="#6B7280"
+                               FontSize="13" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                HorizontalTextAlignment="Center" MaxLines="4" LineBreakMode="WordWrap" />
                     </VerticalStackLayout>
                 </Border>
@@ -80,12 +108,12 @@
 
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                    <Label Text="Converted attendance" FontSize="22" FontAttributes="Bold" TextColor="#111827" />
-                    <Label x:Name="SavedLabel" FontSize="12" TextColor="#6B7280" MaxLines="2" LineBreakMode="WordWrap" />
+                    <Label Text="Converted attendance" FontSize="22" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Label x:Name="SavedLabel" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="2" LineBreakMode="WordWrap" />
                 </VerticalStackLayout>
                 <Button Grid.Column="1"
                         Text="Convert another file"
-                        BackgroundColor="White" TextColor="#059669"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
                         BorderColor="#059669" BorderWidth="1"
                         FontSize="13" FontAttributes="Bold"
                         CornerRadius="12" Padding="16,10"
@@ -95,46 +123,46 @@
 
             <HorizontalStackLayout Grid.Row="1" Spacing="10">
 
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                         StrokeShape="RoundRectangle 16" Padding="16,10" >
                     <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                     <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatTotal" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
-                        <Label Text="rows" FontSize="11" TextColor="#6B7280" />
+                        <Label x:Name="StatTotal" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Label Text="rows" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                         StrokeShape="RoundRectangle 16" Padding="16,10">
                     <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                     <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatPresent" FontSize="20" FontAttributes="Bold" TextColor="#059669" />
-                        <Label Text="present" FontSize="11" TextColor="#6B7280" />
+                        <Label x:Name="StatPresent" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
+                        <Label Text="present" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                         StrokeShape="RoundRectangle 16" Padding="16,10">
                     <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                     <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatAbsent" FontSize="20" FontAttributes="Bold" TextColor="#DC2626" />
-                        <Label Text="absent" FontSize="11" TextColor="#6B7280" />
+                        <Label x:Name="StatAbsent" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+                        <Label Text="absent" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                         StrokeShape="RoundRectangle 16" Padding="16,10" IsVisible="False" x:Name="InOnlyCard">
                     <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                     <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatInOnly" FontSize="20" FontAttributes="Bold" TextColor="#D97706" />
-                        <Label Text="in punch only" FontSize="11" TextColor="#6B7280" />
+                        <Label x:Name="StatInOnly" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource WarningLight}, Dark={StaticResource WarningDark}}" />
+                        <Label Text="in punch only" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
             </HorizontalStackLayout>
 
             <!-- segmented tabs: Table | Dashboard + save-PDF -->
             <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White" StrokeShape="RoundRectangle 12" Padding="4">
+                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" StrokeShape="RoundRectangle 12" Padding="4">
                     <HorizontalStackLayout Spacing="4">
                         <Button x:Name="TabTableBtn" Text="Table" CornerRadius="9" Padding="18,8"
                                 FontSize="13" FontAttributes="Bold"
@@ -142,14 +170,14 @@
                                 Clicked="OnTabTableClicked" />
                         <Button x:Name="TabDashboardBtn" Text="Dashboard" CornerRadius="9" Padding="18,8"
                                 FontSize="13" FontAttributes="Bold"
-                                BackgroundColor="White" TextColor="#374151"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
                                 Clicked="OnTabDashboardClicked" />
                     </HorizontalStackLayout>
                 </Border>
                 <Button Grid.Column="2" x:Name="SavePdfBtn"
                         Text="Save dashboard as PDF"
-                        BackgroundColor="White" TextColor="#DC2626"
-                        BorderColor="#DC2626" BorderWidth="1"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}"
+                        BorderColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" BorderWidth="1"
                         FontSize="13" FontAttributes="Bold"
                         CornerRadius="12" Padding="16,10"
                         HorizontalOptions="End"
@@ -158,7 +186,7 @@
             </Grid>
 
             <!-- table tab (the converted rows, like the Excel sheet) -->
-            <Border x:Name="TableCard" Grid.Row="3" Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+            <Border x:Name="TableCard" Grid.Row="3" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                     StrokeShape="RoundRectangle 16" Padding="0"
                     HorizontalOptions="Fill" VerticalOptions="Fill">
                 <Border.Shadow>
@@ -167,7 +195,8 @@
                 <ScrollView Orientation="Horizontal">
                     <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
                         <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
-                                  CachingStrategy="RecycleElement" SeparatorVisibility="None" />
+                                  CachingStrategy="RecycleElement" SeparatorVisibility="None"
+                                  BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
                     </Grid>
                 </ScrollView>
             </Border>
@@ -177,53 +206,53 @@
                 <VerticalStackLayout Spacing="12">
 
                     <HorizontalStackLayout Spacing="10">
-                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                                 StrokeShape="RoundRectangle 16" Padding="16,10">
                             <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                             <VerticalStackLayout Spacing="0">
-                                <Label x:Name="DashEmployees" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
-                                <Label Text="employees" FontSize="11" TextColor="#6B7280" />
+                                <Label x:Name="DashEmployees" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                <Label Text="employees" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                         </Border>
-                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                                 StrokeShape="RoundRectangle 16" Padding="16,10">
                             <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                             <VerticalStackLayout Spacing="0">
-                                <Label x:Name="DashAvgIn" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
-                                <Label Text="avg in" FontSize="11" TextColor="#6B7280" />
+                                <Label x:Name="DashAvgIn" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                <Label Text="avg in" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                         </Border>
-                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                                 StrokeShape="RoundRectangle 16" Padding="16,10">
                             <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                             <VerticalStackLayout Spacing="0">
-                                <Label x:Name="DashAvgOut" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
-                                <Label Text="avg out" FontSize="11" TextColor="#6B7280" />
+                                <Label x:Name="DashAvgOut" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                <Label Text="avg out" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                         </Border>
-                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                        <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                                 StrokeShape="RoundRectangle 16" Padding="16,10">
                             <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                             <VerticalStackLayout Spacing="0">
-                                <Label x:Name="DashAvgHours" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
-                                <Label Text="avg hours" FontSize="11" TextColor="#6B7280" />
+                                <Label x:Name="DashAvgHours" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                <Label Text="avg hours" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                         </Border>
                     </HorizontalStackLayout>
 
-                    <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                    <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                             StrokeShape="RoundRectangle 16" Padding="14">
                         <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
                         <VerticalStackLayout Spacing="8">
-                            <Label Text="Daily attendance" FontSize="13" FontAttributes="Bold" TextColor="#111827" />
+                            <Label Text="Daily attendance" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
                             <HorizontalStackLayout Spacing="12">
                                 <HorizontalStackLayout Spacing="4">
-                                    <BoxView Color="#059669" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="present" FontSize="11" TextColor="#6B7280" VerticalOptions="Center" />
+                                    <BoxView Color="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
+                                    <Label Text="present" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                                 <HorizontalStackLayout Spacing="4">
                                     <BoxView Color="#FCA5A5" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="absent" FontSize="11" TextColor="#6B7280" VerticalOptions="Center" />
+                                    <Label Text="absent" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                             </HorizontalStackLayout>
                             <ScrollView Orientation="Horizontal" HeightRequest="150">
@@ -232,18 +261,18 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                    <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                             StrokeShape="RoundRectangle 16" Padding="10">
                         <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
                         <VerticalStackLayout Spacing="6">
-                            <Label Text="Employee summary" FontSize="13" FontAttributes="Bold" TextColor="#111827" Padding="6,0" />
+                            <Label Text="Employee summary" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" Padding="6,0" />
                             <ScrollView Orientation="Horizontal">
                                 <StackLayout x:Name="DashEmployeeTable" Spacing="0" />
                             </ScrollView>
                         </VerticalStackLayout>
                     </Border>
 
-                    <Label x:Name="DashStatus" Text="" FontSize="12" TextColor="#6B7280" />
+                    <Label x:Name="DashStatus" Text="" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                 </VerticalStackLayout>
             </ScrollView>
         </Grid>
