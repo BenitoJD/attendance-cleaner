@@ -240,9 +240,6 @@ public partial class MainPage : ContentPage
         var d = _dashboard;
 
         DashEmployees.Text = $"{d.EmployeeCount}";
-        DashAvgIn.Text = d.AverageIn ?? "-";
-        DashAvgOut.Text = d.AverageOut ?? "-";
-        DashAvgHours.Text = d.AverageHours ?? "-";
         DashStatus.Text = "";
 
         BuildChart(d);
