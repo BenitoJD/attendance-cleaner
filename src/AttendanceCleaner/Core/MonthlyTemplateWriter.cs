@@ -91,8 +91,15 @@ public static class MonthlyTemplateWriter
                 byDate.TryGetValue(date, out var record);
                 var isPresent = IsPresent(record);
                 var status = record?.Status?.Trim() ?? "";
+                var creditHoliday = mandatoryHolidayDates.Contains(date) && !HasRecordedAttendance(record);
 
-                if (isPresent)
+                if (creditHoliday)
+                {
+                    present++;
+                    dutyTotal += 9m;
+                    total += 9m;
+                }
+                else if (isPresent)
                 {
                     present++;
                     var hours = CalculateHours(record!);
@@ -265,6 +272,10 @@ public static class MonthlyTemplateWriter
 
         var holidaysByDate = holidays.Where(entry => entry.Date.Year == month.Year && entry.Date.Month == month.Month)
             .GroupBy(entry => entry.Date).ToDictionary(group => group.Key, group => group.ToList());
+        var mandatoryHolidayDates = holidaysByDate
+            .Where(group => group.Value.Any(entry => IsMandatoryHoliday(entry.Category)))
+            .Select(group => group.Key)
+            .ToHashSet();
         for (var day = 1; day <= daysInMonth; day++)
         {
             var date = new DateOnly(month.Year, month.Month, day);
@@ -321,7 +332,18 @@ public static class MonthlyTemplateWriter
                 var date = new DateOnly(month.Year, month.Month, day);
                 var firstCol = 5 + (day - 1) * 2;
                 byDate.TryGetValue(date, out var record);
-                if (kind == MonthlyTemplateKind.DutyAndOvertime)
+                var creditHoliday = mandatoryHolidayDates.Contains(date) && !HasRecordedAttendance(record);
+                if (creditHoliday && kind == MonthlyTemplateKind.DutyAndOvertime)
+                {
+                    ws.Cell(rowNumber, firstCol).Value = 9m;
+                    ws.Cell(rowNumber, firstCol + 1).Value = 0m;
+                }
+                else if (creditHoliday)
+                {
+                    ws.Cell(rowNumber, firstCol).Value = "07:00";
+                    ws.Cell(rowNumber, firstCol + 1).Value = "16:00";
+                }
+                else if (kind == MonthlyTemplateKind.DutyAndOvertime)
                 {
                     if (record is not null && IsPresent(record))
                     {
@@ -538,6 +560,13 @@ public static class MonthlyTemplateWriter
         if (record.Status?.Trim().StartsWith("P", StringComparison.OrdinalIgnoreCase) == true) return true;
         return TryParseHours(record.Attended, out var attended) && attended > 0;
     }
+
+    private static bool HasRecordedAttendance(AttendanceRecord? record) =>
+        record is not null
+        && (record.InPunch is not null
+            || record.OutPunch is not null
+            || (TryParseHours(record.Attended, out var attended) && attended > 0)
+            || (TryParseHours(record.Overtime, out var overtime) && overtime > 0));
 
     private static bool IsLeaveStatus(string status) =>
         status.StartsWith("W", StringComparison.OrdinalIgnoreCase)

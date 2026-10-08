@@ -87,12 +87,77 @@ public sealed class MonthlyTemplateTests
     public void Summary_splits_a_0700_to_1900_day_into_nine_duty_and_three_ot_hours()
     {
         var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(
-            SampleRecords(), HolidayCalendarStore.Seed2026(), Month));
+            SampleRecords(), Array.Empty<HolidayEntry>(), Month));
 
         Assert.Equal(1, summary.PresentDays);
         Assert.Equal(9m, summary.TotalDutyHours);
         Assert.Equal(3m, summary.TotalOvertimeHours);
         Assert.Equal(12m, summary.TotalHours);
+    }
+
+    [Fact]
+    public void Mandatory_holiday_without_attendance_is_credited_as_nine_hours()
+    {
+        var records = new[]
+        {
+            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+        };
+        var holidays = HolidayCalendarStore.Seed2026();
+        var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, holidays, Month));
+
+        Assert.Equal(1, summary.PresentDays);
+        Assert.Equal(9m, summary.TotalDutyHours);
+        Assert.Equal(0m, summary.TotalOvertimeHours);
+        Assert.Equal(9m, summary.TotalHours);
+
+        using var stream = new MemoryStream();
+        MonthlyTemplateWriter.Write(records, holidays, MonthlyTemplateKind.DutyAndOvertime, stream);
+        stream.Position = 0;
+        using var workbook = new XLWorkbook(stream);
+        var attendance = workbook.Worksheet("Attendance");
+        const int september14FirstColumn = 31;
+        Assert.Equal(9m, attendance.Cell(6, september14FirstColumn).GetValue<decimal>());
+        Assert.Equal(0m, attendance.Cell(6, september14FirstColumn + 1).GetValue<decimal>());
+        Assert.Equal(9m, attendance.Cell(6, 65).GetValue<decimal>());
+        Assert.Equal(1, attendance.Cell(6, 67).GetValue<int>());
+    }
+
+    [Fact]
+    public void In_out_holiday_without_attendance_uses_a_nine_hour_shift()
+    {
+        var records = new[]
+        {
+            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+        };
+        using var stream = new MemoryStream();
+
+        MonthlyTemplateWriter.Write(records, HolidayCalendarStore.Seed2026(), MonthlyTemplateKind.InAndOut, stream);
+        stream.Position = 0;
+        using var workbook = new XLWorkbook(stream);
+        var attendance = workbook.Worksheet("Attendance");
+        const int september14FirstColumn = 31;
+
+        Assert.Equal("07:00", attendance.Cell(6, september14FirstColumn).GetString());
+        Assert.Equal("16:00", attendance.Cell(6, september14FirstColumn + 1).GetString());
+        Assert.Equal(9m, attendance.Cell(6, 65).GetValue<decimal>());
+        Assert.Equal(1, attendance.Cell(6, 67).GetValue<int>());
+    }
+
+    [Fact]
+    public void Optional_holiday_without_attendance_is_not_auto_credited()
+    {
+        var records = new[]
+        {
+            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+        };
+        var optionalHoliday = HolidayEntry.Create(
+            new DateOnly(2026, 9, 14), "Optional holiday", "Optional · Corporate Office");
+
+        var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(
+            records, new[] { optionalHoliday }, Month));
+
+        Assert.Equal(0m, summary.TotalHours);
+        Assert.Equal(0, summary.PresentDays);
     }
 
     [Fact]
