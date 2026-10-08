@@ -100,7 +100,7 @@ public sealed class MonthlyTemplateTests
     {
         var records = new[]
         {
-            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+            new AttendanceRecord("007", "Example Employee", "-", new DateOnly(2026, 9, 14), null, null, 0, Status: "A-#"),
         };
         var holidays = HolidayCalendarStore.Seed2026();
         var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, holidays, Month));
@@ -127,7 +127,7 @@ public sealed class MonthlyTemplateTests
     {
         var records = new[]
         {
-            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+            new AttendanceRecord("007", "Example Employee", "-", new DateOnly(2026, 9, 14), null, null, 0, Status: "A-#"),
         };
         using var stream = new MemoryStream();
 
@@ -198,7 +198,7 @@ public sealed class MonthlyTemplateTests
     {
         var records = new[]
         {
-            new AttendanceRecord("007", "Example Employee", "-", Month, null, null, 0, Status: "A-#"),
+            new AttendanceRecord("007", "Example Employee", "-", new DateOnly(2026, 9, 14), null, null, 0, Status: "A-#"),
         };
         var optionalHoliday = HolidayEntry.Create(
             new DateOnly(2026, 9, 14), "Optional holiday", "Optional · Corporate Office");

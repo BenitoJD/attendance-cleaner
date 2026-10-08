@@ -140,7 +140,7 @@ public class AdversarialContentTests
             days.Select(d => d % 3 == 0 ? $"0{i % 10}:15" : (string?)null).ToArray(),
             days.Select(d => d % 3 == 0 ? "18:30" : (string?)null).ToArray())).ToArray();
 
-        var html = TestReports.MonthlyBlocksFlexible("01-09-2026", days, employees);
+        var html = TestReports.MonthlyBlocksFlexible("01-10-2026", days, employees);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var report = AttendanceParser.Parse(html);

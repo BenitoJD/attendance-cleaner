@@ -527,6 +527,11 @@ public partial class MainPage : ContentPage
                 {
                     throw new InvalidDataException("No attendance rows were found in this file.");
                 }
+                if (isMonthlyReport && dates.Any(date => date.Year != dates[0].Year || date.Month != dates[0].Month))
+                    throw new InvalidDataException("Monthly templates support one calendar month per report. Export each month separately.");
+                IReadOnlyList<HolidayEntry> holidays = isMonthlyReport
+                    ? _holidayCalendarStore.LoadOrSeed()
+                    : Array.Empty<HolidayEntry>();
 
                 // The selected template category determines the output file name.
                 var fileName = string.Format(
@@ -547,8 +552,15 @@ public partial class MainPage : ContentPage
                         ? "Monthly totals use the report's employee counts. No daily leave/absence codes are available, so dates cannot be identified and totals may not match the calendar."
                         : "This report has no daily leave/absence codes or summary counts. Monthly absence and leave are inferred from punches and the calendar."
                     : "";
+                if (isMonthlyReport)
+                {
+                    var warnings = new List<string> { monthlyWarning, HolidayCalendarStore.GetYearWarning(holidays, dates[0].Year) };
+                    if (dates.Count < DateTime.DaysInMonth(dates[0].Year, dates[0].Month))
+                        warnings.Add("Attendance totals count only exported dates. Unreported dates are left blank.");
+                    monthlyWarning = string.Join(" ", warnings.Where(warning => !string.IsNullOrWhiteSpace(warning)));
+                }
 
-                return (report, dates, fileName, monthlyWarning);
+                return (report, dates, fileName, monthlyWarning, holidays);
             });
 
             // 2. let the user choose where to save it
@@ -567,7 +579,7 @@ public partial class MainPage : ContentPage
                 MonthlyWorkbookPreview? monthlyPreview = null;
                 if (selectedCategory == ReportCategory.Monthly)
                 {
-                    var holidays = _holidayCalendarStore.LoadOrSeed();
+                    var holidays = parsed.holidays;
                     var monthlyKind = selectedMonthlyTemplate!.Value;
                     MonthlyTemplateWriter.Write(parsed.report.Records, holidays, monthlyKind, ms,
                         parsed.report.EmployeeTotals);
@@ -1058,7 +1070,7 @@ public partial class MainPage : ContentPage
             (float)Math.Clamp(excelWidth * 7.1, 38, 190);
 
         private static float ToDeviceRowHeight(double excelHeight) =>
-            (float)Math.Clamp(excelHeight * 1.35, 22, 44);
+            (float)Math.Clamp(excelHeight * 1.35, 22, 120);
 
         private static Microsoft.Maui.Graphics.Color ParseColor(string? color, string fallback) =>
             Microsoft.Maui.Graphics.Color.FromArgb(string.IsNullOrWhiteSpace(color) ? fallback : color);

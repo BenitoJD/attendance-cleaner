@@ -193,13 +193,23 @@ public static class TestReports
     {
         string L(string s) => lowercaseLabels ? s.ToLowerInvariant() : s;
         var dayCells = string.Concat(days.Select(d => $"<td>{d}</td>"));
+        var from = DateOnly.ParseExact(fromDateText, "dd-MM-yyyy", CultureInfo.InvariantCulture);
+        var month = new DateOnly(from.Year, from.Month, 1);
+        var previousDay = from.Day;
+        var to = from;
+        foreach (var day in days)
+        {
+            if (day < previousDay) month = month.AddMonths(1);
+            to = new DateOnly(month.Year, month.Month, day);
+            previousDay = day;
+        }
 
         string Cells(IEnumerable<string?> values) => string.Concat(values.Select(v => $"<td>{v ?? "-"}</td>"));
 
         var sb = new StringBuilder();
         sb.Append("<html xmlns:x=\"urn:schemas-microsoft-com:office:excel\"><head><title>Attendance Monthly Report</title></head><body><table>");
         sb.Append("<tr><td colspan=32>Attendance Monthly Report</td></tr>");
-        sb.Append($"<tr><td colspan=32>From: {fromDateText} To: {fromDateText}</td></tr>");
+        sb.Append(CultureInfo.InvariantCulture, $"<tr><td colspan=32>From: {fromDateText} To: {to:dd-MM-yyyy}</td></tr>");
         sb.Append("</table><table>");
 
         for (var e = 0; e < employees.Length; e++)

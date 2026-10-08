@@ -31,6 +31,14 @@ The attendance software exports HTML tables with an `.xls` extension. Three layo
 
 The `Sep Monthly Over View Report` contains attendance statuses but no punch times, so it cannot fill the monthly punch templates. Choose a detailed monthly report instead.
 
+The importer handles every calendar month, including 28/29-day February and 30/31-day months, using the dates inside the export. Numeric dates use **day-month-year** (with `-`, `/`, or `.`), or ISO **year-month-day**; single-digit days/months and timestamps are accepted. Monthly dates are checked against the report's declared From/To range. Invalid dates and incomplete attendance rows produce an import error instead of silently dropping data or inventing dates.
+
+Automated calendar regression tests cover every month from **2026 through 2036** (the current year plus ten future years) across all three import formats and both monthly workbook layouts. They check exact dates and punches, month lengths and weekdays, partial exports, skipped days at every month/year boundary, and acceptance or rejection of February 29. This validates the supported export layouts; each year's holidays and working Saturdays still come from the editable calendar.
+
+Partial monthly exports count **only the exported dates** in attendance totals. Unreported dates stay blank, and the Remarks column shows the number of reported dates. Monthly templates accept one calendar month at a time; export separate files for ranges spanning multiple months. The parser can map day columns correctly across month/year boundaries, including skipped days.
+
+The bundled holiday calendar is for **2026**. For another year, configure that year's holidays and working Saturdays in **Manage holidays**. If no calendar entries exist for the report year, the app and the workbook's Holiday Details sheet show a warning.
+
 ## Removing the Windows warning (code signing)
 
 Windows 11's **Smart App Control** (and SmartScreen on Windows 10) block unsigned apps. The permanent fix is signing the exes with a code signing certificate; there is no app-side trick that avoids it.

@@ -53,6 +53,11 @@ public sealed class HolidayCalendarStore(string path)
 
     private sealed record SeedHoliday(DateOnly Date, string Name, string Category);
 
+    public static string GetYearWarning(IReadOnlyCollection<HolidayEntry> entries, int year) =>
+        entries.Any(entry => entry.Date.Year == year)
+            ? ""
+            : $"No holiday or working Saturday entries are configured for {year}. Review that year's calendar in Manage holidays; holiday credits and working Saturdays for this year have not been applied.";
+
     public static IReadOnlyList<HolidayEntry> Sort(IEnumerable<HolidayEntry> entries) =>
         entries.OrderBy(entry => entry.Date)
             .ThenBy(entry => entry.Category, StringComparer.OrdinalIgnoreCase)

@@ -37,6 +37,12 @@ public static partial class AttendanceParser
 
     public static ParsedReport ParseFile(string path)
     {
+        using (var stream = File.OpenRead(path))
+        {
+            Span<byte> signature = stackalloc byte[8];
+            var length = stream.Read(signature);
+            ValidateInputIsNotWorkbook(signature[..length]);
+        }
         var html = File.ReadAllText(path);
         return Parse(html);
     }
@@ -85,12 +91,12 @@ public static partial class AttendanceParser
         }
         if (tables.Any(t => t.Any(r => Same(Cell(r, 0), LabelPersonId))))
         {
-            return new ParsedReport(AttendanceExportFormat.MonthlyBlocks, ParseMonthlyBlocks(tables, html));
+            return new ParsedReport(AttendanceExportFormat.MonthlyBlocks, ParseMonthlyBlocks(tables));
         }
         if (FindMonthlyRowsHeader(tables) is { } monthly)
         {
             var (records, totals) = ParseMonthlyRows(
-                tables, monthly.header, monthly.summaryHeader, monthly.dayColumns, html);
+                tables, monthly.header, monthly.summaryHeader, monthly.dayColumns);
             return new ParsedReport(AttendanceExportFormat.MonthlyRows, records, totals);
         }
         if (LooksLikeMonthlyOverview(tables))
@@ -123,20 +129,26 @@ public static partial class AttendanceParser
         int ixIn = header.FindIndex(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase));
         int ixOut = header.FindIndex(c => c.StartsWith("Check-out", StringComparison.OrdinalIgnoreCase));
         int ixAttended = FindIndex(header, LabelAttended);
+        if (new[] { ixNo, ixId, ixName, ixDate, ixIn, ixOut }.Any(index => index < 0))
+            throw new InvalidDataException("The daily report is missing an employee, date, or check-in/check-out column.");
 
         var records = new List<AttendanceRecord>();
         int order = 0;
         foreach (var row in tables.SelectMany(t => t))
         {
-            if (row.Count < header.Count || !int.TryParse(Cell(row, ixNo), out _))
+            if (!int.TryParse(Cell(row, ixNo), out _))
             {
                 continue; // title rows, note rows, empty rows
             }
 
             if (!TryParseDate(Cell(row, ixDate), out var date))
             {
-                continue;
+                throw new InvalidDataException(
+                    $"Invalid attendance date '{Cell(row, ixDate)}' for employee '{Cell(row, ixId)}' ({Cell(row, ixName)}). " +
+                    "Use day-month-year or year-month-day dates and export the report again.");
             }
+            if (row.Count <= Math.Max(ixIn, ixOut))
+                throw new InvalidDataException($"The attendance row for employee '{Cell(row, ixId)}' on {date:dd-MM-yyyy} is incomplete.");
 
             records.Add(new AttendanceRecord(
                 Id: Cell(row, ixId),
@@ -153,24 +165,43 @@ public static partial class AttendanceParser
 
     // --- Monthly block report: one block of rows per employee, days as columns ---
 
-    private static List<AttendanceRecord> ParseMonthlyBlocks(List<List<List<string>>> tables, string html)
+    private static List<AttendanceRecord> ParseMonthlyBlocks(List<List<List<string>>> tables)
     {
-        var from = StartDateOf(html);
+        var range = ReportRangeOf(tables);
         var records = new List<AttendanceRecord>();
 
         int blockIndex = -1;
-        Dictionary<int, int>? dayByColumn = null;
+        Dictionary<int, DateOnly>? dayByColumn = null;
         Dictionary<int, string>? ins = null, outs = null, attended = null, overtime = null, statuses = null;
         string id = "", name = "";
+        bool hasDates = false;
+
+        void ValidateEmployeeDates()
+        {
+            if (blockIndex >= 0 && !hasDates)
+                throw new InvalidDataException($"The monthly report has no date columns for employee '{id}' ({name}).");
+        }
+
+        void ReadMetric(List<string> row, Dictionary<int, string> values)
+        {
+            var finalDayColumn = dayByColumn!.Keys.Max();
+            if (row.Count <= finalDayColumn)
+                throw new InvalidDataException($"The monthly '{Cell(row, 0)}' row for employee '{id}' is incomplete.");
+            if (row.Skip(finalDayColumn + 1).Any(value => NormalizeMetric(value) is { } metric
+                && !(decimal.TryParse(metric, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) && number == 0)))
+                throw new InvalidDataException($"The monthly '{Cell(row, 0)}' row for employee '{id}' contains data without a date column.");
+            foreach (var col in dayByColumn.Keys) values[col] = Cell(row, col);
+        }
 
         void Flush()
         {
             if (dayByColumn == null) return;
+            if (ins!.Count == 0 || outs!.Count == 0)
+                throw new InvalidDataException($"The monthly report is missing a Check-in or Check-out row for employee '{id}' ({name}).");
             var ordered = dayByColumn.OrderBy(kv => kv.Key).ToList();
             for (var i = 0; i < ordered.Count; i++)
             {
-                var (col, dayNumber) = ordered[i];
-                var date = MapColumnToDate(from, i, dayNumber);
+                var (col, date) = ordered[i];
                 ins!.TryGetValue(col, out var tin);
                 outs!.TryGetValue(col, out var tout);
                 attended!.TryGetValue(col, out var totalHours);
@@ -188,7 +219,9 @@ public static partial class AttendanceParser
             if (Same(label, LabelPersonId))
             {
                 Flush();
+                ValidateEmployeeDates();
                 blockIndex++;
+                hasDates = false;
                 dayByColumn = null;
                 ins = new Dictionary<int, string>();
                 outs = new Dictionary<int, string>();
@@ -199,39 +232,47 @@ public static partial class AttendanceParser
             }
             else if (Same(label, LabelDate) && blockIndex >= 0)
             {
-                dayByColumn = new Dictionary<int, int>();
+                if (hasDates)
+                    throw new InvalidDataException($"Repeated monthly date rows for employee '{id}' ({name}). Export the report again.");
+                var days = new Dictionary<int, int>();
                 for (int c = 1; c < row.Count; c++)
                 {
-                    if (int.TryParse(Cell(row, c), out var day) && day is >= 1 and <= 31)
+                    if (int.TryParse(Cell(row, c), out var day))
                     {
-                        dayByColumn[c] = day;
+                        days[c] = day;
                     }
+                    else if (!string.IsNullOrWhiteSpace(Cell(row, c))
+                        || row.Skip(c + 1).Any(cell => !string.IsNullOrWhiteSpace(cell)))
+                        throw new InvalidDataException($"Invalid monthly date column '{Cell(row, c)}'. Expected a day number.");
                 }
+                dayByColumn = MapDayColumns(range, days);
+                hasDates = true;
             }
             else if (Same(label, LabelCheckIn) && dayByColumn != null)
             {
-                foreach (var col in dayByColumn.Keys) ins![col] = Cell(row, col);
+                ReadMetric(row, ins!);
             }
             else if (Same(label, LabelCheckOut) && dayByColumn != null)
             {
-                foreach (var col in dayByColumn.Keys) outs![col] = Cell(row, col);
+                ReadMetric(row, outs!);
             }
             else if (Same(label, LabelAttended) && dayByColumn != null)
             {
-                foreach (var col in dayByColumn.Keys) attended![col] = Cell(row, col);
+                ReadMetric(row, attended!);
             }
             else if (IsOvertimeLabel(label) && dayByColumn != null)
             {
-                foreach (var col in dayByColumn.Keys) overtime![col] = Cell(row, col);
+                ReadMetric(row, overtime!);
             }
             else if (Same(label, LabelStatus) && dayByColumn != null)
             {
-                foreach (var col in dayByColumn.Keys) statuses![col] = Cell(row, col);
+                ReadMetric(row, statuses!);
                 Flush();
                 dayByColumn = null;
             }
         }
         Flush();
+        ValidateEmployeeDates();
         return records;
     }
 
@@ -261,16 +302,24 @@ public static partial class AttendanceParser
             for (var rowIndex = 0; rowIndex < table.Count; rowIndex++)
             {
                 var row = table[rowIndex];
-                if (!Same(Cell(row, 0), LabelNo) || !row.Any(c => Same(c, LabelPersonId))) continue;
+                var nameColumn = FindIndex(row, LabelName);
+                if (!Same(Cell(row, 0), LabelNo) || FindIndex(row, LabelPersonId) < 0 || nameColumn < 0) continue;
                 var dayColumns = new List<int>();
-                for (int c = 0; c < row.Count; c++)
+                for (int c = nameColumn + 2; c < row.Count; c++)
                 {
-                    if (int.TryParse(Cell(row, c), out var d) && d is >= 1 and <= 31)
+                    if (int.TryParse(Cell(row, c), out _))
                     {
                         dayColumns.Add(c);
                     }
+                    else
+                    {
+                        if (IsMonthlySummaryHeader(Cell(row, c))) break;
+                        throw new InvalidDataException($"Invalid monthly date column '{Cell(row, c)}'. Expected a day number.");
+                    }
                 }
-                if (dayColumns.Count >= 28)
+                if (dayColumns.Count > 0 && tables.SelectMany(rows => rows)
+                    .Any(metric => Same(Cell(metric, nameColumn + 1), LabelCheckIn)
+                        || Same(Cell(metric, nameColumn + 1), LabelCheckOut)))
                 {
                     var summaryHeader = rowIndex + 1 < table.Count ? table[rowIndex + 1] : new List<string>();
                     return (row, summaryHeader, dayColumns);
@@ -283,16 +332,16 @@ public static partial class AttendanceParser
         tables.SelectMany(t => t).Any(row =>
             Same(Cell(row, 0), "Department")
             && Same(Cell(row, 1), LabelName)
-            && row.Count(c => int.TryParse(c, out var day) && day is >= 1 and <= 31) >= 28);
+            && row.Any(c => int.TryParse(c, out var day) && day is >= 1 and <= 31));
 
     private static (List<AttendanceRecord> Records, List<MonthlyEmployeeTotals> Totals) ParseMonthlyRows(
         List<List<List<string>>> tables,
         List<string> header,
         List<string> summaryHeader,
-        List<int> dayColumns,
-        string html)
+        List<int> dayColumns)
     {
-        var from = StartDateOf(html);
+        var datesByColumn = MapDayColumns(ReportRangeOf(tables), dayColumns
+            .ToDictionary(column => column, column => int.Parse(Cell(header, column), CultureInfo.InvariantCulture)));
         int ixNo = FindIndex(header, LabelNo);
         int ixId = FindIndex(header, LabelPersonId);
         int ixName = FindIndex(header, LabelName);
@@ -307,13 +356,12 @@ public static partial class AttendanceParser
                 .ToArray();
 
         var rows = tables.SelectMany(t => t)
-            .Where(r => r.Count > labelColumn && r.Count > dayColumns.Max())
+            .Where(r => r.Count > labelColumn)
             .ToList();
 
         // metric rows repeat (No, ID, Name) on every row of the employee's block
-        var blocks = new Dictionary<string, Dictionary<string, Dictionary<int, string>>>();
-        var order = new Dictionary<string, int>();
-        var employeeTotals = new Dictionary<string, MonthlyEmployeeTotals>();
+        var blocks = new Dictionary<(int No, string Id, string Name), Dictionary<string, Dictionary<int, string>>>();
+        var employeeTotals = new Dictionary<(int No, string Id, string Name), MonthlyEmployeeTotals>();
         foreach (var row in rows)
         {
             var label = Cell(row, labelColumn);
@@ -324,13 +372,14 @@ public static partial class AttendanceParser
             var isStatus = Same(label, LabelStatus);
             if (!isCheckIn && !isCheckOut && !isAttended && !isOvertime && !isStatus) continue;
             if (!int.TryParse(Cell(row, ixNo), out var no)) continue;
+            if (row.Count <= dayColumns.Max())
+                throw new InvalidDataException($"The monthly '{label}' row for employee '{Cell(row, ixId)}' is incomplete.");
 
-            var key = $"{Cell(row, ixNo)}|{Cell(row, ixId)}|{Cell(row, ixName)}";
+            var key = (No: no, Id: Cell(row, ixId), Name: Cell(row, ixName));
             if (!blocks.TryGetValue(key, out var metrics))
             {
                 metrics = new Dictionary<string, Dictionary<int, string>>();
                 blocks[key] = metrics;
-                order[key] = no;
             }
             if (isCheckIn)
             {
@@ -354,25 +403,23 @@ public static partial class AttendanceParser
         var records = new List<AttendanceRecord>();
         foreach (var (key, metrics) in blocks)
         {
-            var parts = key.Split('|');
-            string id = parts[1], name = parts[2];
-            var ins = metrics.GetValueOrDefault(LabelCheckIn) ?? new Dictionary<int, string>();
-            var outs = metrics.GetValueOrDefault(LabelCheckOut) ?? new Dictionary<int, string>();
+            var (_, id, name) = key;
+            if (!metrics.TryGetValue(LabelCheckIn, out var ins) || !metrics.TryGetValue(LabelCheckOut, out var outs))
+                throw new InvalidDataException($"The monthly report is missing a Check-in or Check-out row for employee '{id}' ({name}).");
             var attended = metrics.GetValueOrDefault(LabelAttended) ?? new Dictionary<int, string>();
             var overtime = metrics.GetValueOrDefault(LabelOvertime) ?? new Dictionary<int, string>();
             var statuses = metrics.GetValueOrDefault(LabelStatus) ?? new Dictionary<int, string>();
             for (var i = 0; i < dayColumns.Count; i++)
             {
                 var col = dayColumns[i];
-                if (!int.TryParse(Cell(header, col), out var dayNumber)) continue;
-                var date = MapColumnToDate(from, i, dayNumber);
+                var date = datesByColumn[col];
                 ins.TryGetValue(col, out var tin);
                 outs.TryGetValue(col, out var tout);
                 attended.TryGetValue(col, out var totalHours);
                 overtime.TryGetValue(col, out var otHours);
                 statuses.TryGetValue(col, out var status);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
-                    NormalizePunch(tin), NormalizePunch(tout), Order: order[key],
+                    NormalizePunch(tin), NormalizePunch(tout), Order: key.No,
                     Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
             }
         }
@@ -425,7 +472,7 @@ public static partial class AttendanceParser
         // Cells carried down from earlier rows by rowspan: column -> (text, rows left after current).
         var active = new SortedDictionary<int, (string Text, int Remaining)>();
 
-        foreach (var tr in table.SelectNodes("./tr") ?? new HtmlNodeCollection(table))
+        foreach (var tr in table.SelectNodes("./tr|./thead/tr|./tbody/tr|./tfoot/tr") ?? new HtmlNodeCollection(table))
         {
             var row = new SortedDictionary<int, string>();
             foreach (var (col, cell) in active)
@@ -478,6 +525,14 @@ public static partial class AttendanceParser
     private static bool IsOvertimeLabel(string value) =>
         Same(value, LabelOvertime) || Same(value, "Overtime") || Same(value, "Over Time");
 
+    private static bool IsMonthlySummaryHeader(string value)
+    {
+        if (value.Trim() == "*") return true;
+        var normalized = NormalizeHeader(value);
+        return new[] { "work", "absent", "attendedactual", "leave", "late", "early", "overtime", "total" }
+            .Any(prefix => normalized.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
     private static string? NormalizeMetric(string? value)
     {
         value = value?.Trim();
@@ -497,24 +552,37 @@ public static partial class AttendanceParser
         return $"{hour:00}:{minute:00}";
     }
 
-    /// <summary>
-    /// Finds the report's start date ("From: dd-MM-yyyy ...") in the document.
-    /// Every content date in monthly exports is derived relative to this date.
-    /// </summary>
-    private static DateOnly StartDateOf(string html)
+    private readonly record struct ReportRange(DateOnly From, DateOnly To);
+
+    /// <summary>Reads the declared range from decoded cells, never from metadata or employee joining dates.</summary>
+    private static ReportRange ReportRangeOf(List<List<List<string>>> tables)
     {
-        var match = Regex.Match(html, @"\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b");
-        if (match.Success
-            && TryMakeDate(int.Parse(match.Groups[3].Value), int.Parse(match.Groups[2].Value), int.Parse(match.Groups[1].Value), out var from))
+        var text = string.Join(" ", tables.SelectMany(table => table).SelectMany(row => row));
+        var match = Regex.Match(text, @"\bFrom\s*:?\s*(?<from>\S+)\s+.*?\bTo\s*:?\s*(?<to>\S+)",
+            RegexOptions.IgnoreCase);
+        if (!match.Success)
         {
-            return from;
+            // Some exports omit the From label but still have an explicit date-to-date title.
+            match = Regex.Match(text,
+                @"(?<![\d/.-])(?<from>\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\s+To\s*:?\s*(?<to>\S+)",
+                RegexOptions.IgnoreCase);
         }
-        throw new InvalidDataException("Could not find a From/To date in the report to determine the month.");
+        if (!match.Success)
+            throw new InvalidDataException("Could not find a From/To date range in the report to determine the month.");
+
+        var fromText = match.Groups["from"].Value;
+        var toText = match.Groups["to"].Value;
+        if (!TryParseDate(fromText, out var from) || !TryParseDate(toText, out var to))
+            throw new InvalidDataException($"Invalid report date range '{fromText}' to '{toText}'. Use day-month-year or year-month-day dates.");
+        if (to < from)
+            throw new InvalidDataException($"Invalid report date range: To date {to:dd-MM-yyyy} is before From date {from:dd-MM-yyyy}.");
+        return new ReportRange(from, to);
     }
 
     private static readonly string[] DateFormats =
     {
-        "dd-MM-yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "dd.MM.yyyy", "dd-MM-yy",
+        "d-M-yyyy", "d/M/yyyy", "d.M.yyyy", "yyyy-M-d", "yyyy/M/d", "yyyy.M.d",
+        "d-M-yy", "d/M/yy", "d.M.yy",
     };
 
     private static bool TryParseDate(string value, out DateOnly date)
@@ -525,13 +593,13 @@ public static partial class AttendanceParser
             return true;
         }
         // tolerate timestamps like "06-10-2026 00:00"
-        var datePart = value.Split(' ', 'T')[0];
+        var datePart = value.Split(new[] { ' ', 'T', 't', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
         return DateOnly.TryParseExact(datePart, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
     }
 
     private static bool TryMakeDate(int year, int month, int day, out DateOnly date)
     {
-        if (month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month))
+        if (year is >= 1 and <= 9999 && month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month))
         {
             date = new DateOnly(year, month, day);
             return true;
@@ -541,23 +609,33 @@ public static partial class AttendanceParser
     }
 
     /// <summary>
-    /// Maps the n-th day column of a monthly report to a calendar date.
-    /// Day numbers are trusted when they agree with the running date sequence starting at the
-    /// report's From date (calendar months, partial months); columns that break the sequence
-    /// fall back to their day number within the From month (rare skipped-day exports); anything
-    /// else continues the sequence, which keeps ranges that cross into a next month correct.
+    /// Resolves ordered day numbers within the declared range, preserving skipped days and
+    /// advancing the month/year on rollover. Invalid headers never become invented dates.
     /// </summary>
-    private static DateOnly MapColumnToDate(DateOnly from, int index, int? dayNumber)
+    private static Dictionary<int, DateOnly> MapDayColumns(ReportRange range, Dictionary<int, int> days)
     {
-        var sequential = from.AddDays(index);
-        if (dayNumber.HasValue && dayNumber.Value == sequential.Day)
+        if (days.Count == 0)
+            throw new InvalidDataException("The monthly report has no date columns.");
+        var result = new Dictionary<int, DateOnly>();
+        var month = new DateOnly(range.From.Year, range.From.Month, 1);
+        int? previousDay = null;
+        foreach (var (column, day) in days.OrderBy(pair => pair.Key))
         {
-            return sequential;
+            if (day is < 1 or > 31 || day == previousDay)
+                throw new InvalidDataException($"Invalid or duplicate monthly date column '{day}'. Expected distinct calendar days in chronological order.");
+            if (previousDay is { } previous && day < previous)
+            {
+                if (month.Year == 9999 && month.Month == 12)
+                    throw new InvalidDataException("The monthly date columns extend beyond the supported calendar.");
+                month = month.AddMonths(1);
+            }
+            if (!TryMakeDate(month.Year, month.Month, day, out var date))
+                throw new InvalidDataException($"Invalid monthly date column '{day}' for {month:MMMM yyyy}.");
+            if (date < range.From || date > range.To)
+                throw new InvalidDataException($"Monthly date column {date:dd-MM-yyyy} is outside the report's From/To date range ({range.From:dd-MM-yyyy} to {range.To:dd-MM-yyyy}).");
+            result[column] = date;
+            previousDay = day;
         }
-        if (dayNumber.HasValue && TryMakeDate(from.Year, from.Month, dayNumber.Value, out var byDayNumber))
-        {
-            return byDayNumber;
-        }
-        return sequential;
+        return result;
     }
 }

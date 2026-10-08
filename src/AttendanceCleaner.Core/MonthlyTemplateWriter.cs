@@ -58,7 +58,8 @@ public static class MonthlyTemplateWriter
         DateOnly month,
         IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
-        var records = source.ToList();
+        var records = source.Where(record => record.Date.Year == month.Year && record.Date.Month == month.Month)
+            .ToList();
         var mandatoryHolidayDates = holidays
             .Where(entry => MonthlyTemplateSpec.IsMandatoryHoliday(entry.Category))
             .Select(entry => entry.Date)
@@ -69,11 +70,6 @@ public static class MonthlyTemplateWriter
             .Select(entry => entry.Date)
             .Where(date => date.Year == month.Year && date.Month == month.Month)
             .ToHashSet();
-        var daysInMonth = DateTime.DaysInMonth(month.Year, month.Month);
-        var scheduledWorkdays = Enumerable.Range(1, daysInMonth)
-            .Select(day => new DateOnly(month.Year, month.Month, day))
-            .Count(date => IsScheduledWorkday(date, mandatoryHolidayDates, workingSaturdayDates));
-
         var summaries = new List<MonthlyEmployeeSummary>();
         foreach (var group in EmployeeGroups(records))
         {
@@ -81,6 +77,8 @@ public static class MonthlyTemplateWriter
                 total.Id == group.Id && string.Equals(total.Name, group.Name, StringComparison.Ordinal));
             var byDate = group.Records.GroupBy(record => record.Date)
                 .ToDictionary(day => day.Key, day => day.OrderBy(record => record.Order).First());
+            var scheduledWorkdays = byDate.Keys
+                .Count(date => IsScheduledWorkday(date, mandatoryHolidayDates, workingSaturdayDates));
             decimal present = 0;
             decimal absent = 0;
             decimal leave = 0;
@@ -88,12 +86,10 @@ public static class MonthlyTemplateWriter
             decimal overtimeTotal = 0;
             decimal total = 0;
 
-            for (var day = 1; day <= daysInMonth; day++)
+            foreach (var (date, record) in byDate)
             {
-                var date = new DateOnly(month.Year, month.Month, day);
-                byDate.TryGetValue(date, out var record);
                 var isPresent = IsPresent(record);
-                var status = record?.Status?.Trim() ?? "";
+                var status = record.Status?.Trim() ?? "";
                 var creditHoliday = mandatoryHolidayDates.Contains(date);
 
                 if (creditHoliday)
@@ -105,7 +101,7 @@ public static class MonthlyTemplateWriter
                 else if (isPresent)
                 {
                     present++;
-                    var hours = CalculateHours(record!);
+                    var hours = CalculateHours(record);
                     dutyTotal += hours.Duty;
                     overtimeTotal += hours.Overtime;
                     total += hours.Duty + hours.Overtime;
@@ -117,8 +113,8 @@ public static class MonthlyTemplateWriter
                 }
                 else
                 {
-                    // Missing weekdays in the monthly export count as absent, as do explicit A statuses.
-                    // The report has one day column per date, so empty cells are meaningful here.
+                    // Empty punches for an exported weekday count as absent, as do explicit A statuses.
+                    // Dates outside this employee's export are not attendance observations.
                     absent++;
                 }
             }
@@ -129,13 +125,12 @@ public static class MonthlyTemplateWriter
                 // The full-version monthly export has aggregate absence/leave totals, but no
                 // daily status row. Move its unworked weekly-off and credited-holiday days
                 // out of the reported absence total; exact leave dates remain unavailable.
-                var unworkedDaysOff = Enumerable.Range(1, daysInMonth)
-                    .Select(day => new DateOnly(month.Year, month.Month, day))
-                    .Count(date => !mandatoryHolidayDates.Contains(date)
-                        && IsRegularDayOff(date, workingSaturdayDates)
-                        && (!byDate.TryGetValue(date, out var record) || !IsPresent(record)));
-                var creditedHolidays = mandatoryHolidayDates
-                    .Count(date => !byDate.TryGetValue(date, out var record) || !IsPresent(record));
+                var unworkedDaysOff = byDate
+                    .Count(day => !mandatoryHolidayDates.Contains(day.Key)
+                        && IsRegularDayOff(day.Key, workingSaturdayDates)
+                        && !IsPresent(day.Value));
+                var creditedHolidays = byDate
+                    .Count(day => mandatoryHolidayDates.Contains(day.Key) && !IsPresent(day.Value));
 
                 if (reportedTotals.AttendedDays is { } attendedDays)
                     present = attendedDays + creditedHolidays;
@@ -350,12 +345,15 @@ public static class MonthlyTemplateWriter
             ws.Cell(rowNumber, 3).Value = SpreadsheetValues.EmployeeId(employee.Id);
             ws.Cell(rowNumber, 2).Value = employee.Name;
             ws.Cell(rowNumber, 4).Value = summary.ScheduledWorkdays;
+            if (byDate.Count < daysInMonth)
+                ws.Cell(rowNumber, remarksColumn).Value = $"Reported dates: {byDate.Count} of {daysInMonth} days";
 
             for (var day = 1; day <= daysInMonth; day++)
             {
                 var date = new DateOnly(month.Year, month.Month, day);
                 var firstCol = 5 + (day - 1) * 2;
-                byDate.TryGetValue(date, out var record);
+                if (!byDate.TryGetValue(date, out var record))
+                    continue;
                 var creditHoliday = mandatoryHolidayDates.Contains(date);
                 if (creditHoliday && kind == MonthlyTemplateKind.DutyAndOvertime)
                 {
@@ -369,14 +367,14 @@ public static class MonthlyTemplateWriter
                 }
                 else if (kind == MonthlyTemplateKind.DutyAndOvertime)
                 {
-                    if (record is not null && IsPresent(record))
+                    if (IsPresent(record))
                     {
                         var hours = CalculateHours(record);
                         ws.Cell(rowNumber, firstCol).Value = hours.Duty;
                         ws.Cell(rowNumber, firstCol + 1).Value = hours.Overtime;
                     }
                 }
-                else if (record is not null)
+                else
                 {
                     if (record.InPunch is not null) ws.Cell(rowNumber, firstCol).Value = record.InPunch;
                     if (record.OutPunch is not null) ws.Cell(rowNumber, firstCol + 1).Value = record.OutPunch;
@@ -505,6 +503,11 @@ public static class MonthlyTemplateWriter
         if (employeeCount > 0) ws.Rows(FirstDataRow, lastRow).Height = 21;
         ws.Range(FirstDataRow, 5, lastRow, summaryStart - 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Range(FirstDataRow, summaryStart, lastRow, summaryWidth).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        var remarks = ws.Range(FirstDataRow, lastColumn, lastRow, lastColumn);
+        remarks.Style.Alignment.WrapText = true;
+        remarks.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        for (var row = FirstDataRow; row <= lastRow; row++)
+            if (!ws.Cell(row, lastColumn).IsEmpty()) ws.Row(row).Height = Math.Max(34, ws.Row(row).Height);
 
         if (kind == MonthlyTemplateKind.DutyAndOvertime)
         {
@@ -534,6 +537,15 @@ public static class MonthlyTemplateWriter
     {
         var entries = HolidayCalendarStore.Sort(holidays);
         ws.Range(1, 1, 1, 3).Merge().Value = $"{MonthlyTemplateSpec.HolidaySheetName} · {month.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
+        var calendarWarning = HolidayCalendarStore.GetYearWarning(holidays, month.Year);
+        if (calendarWarning.Length > 0)
+        {
+            var warningRange = ws.Range(2, 1, 2, 3).Merge();
+            warningRange.Value = calendarWarning;
+            warningRange.Style.Alignment.WrapText = true;
+            warningRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#FCE4D6");
+            ws.Row(2).Height = 60;
+        }
         for (var col = 0; col < HolidayHeaders.Length; col++) ws.Cell(3, col + 1).Value = HolidayHeaders[col];
         for (var index = 0; index < entries.Count; index++)
         {
