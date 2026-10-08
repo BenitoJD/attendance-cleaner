@@ -37,7 +37,8 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui
 
-      - name: Publish Windows exe (self-contained win-x64)
+      # folder build (RECOMMENDED): classic layout with every runtime DLL beside the exe
+      - name: Publish win-x64 (folder)
         run: >
           dotnet publish src/AttendanceCleaner
           -c Release
@@ -47,8 +48,9 @@ jobs:
           -p:WindowsPackageType=None
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
+          -o publish-x64
 
-      - name: Publish Windows exe (self-contained win-x86, 32-bit)
+      - name: Publish win-x86 (folder)
         run: >
           dotnet publish src/AttendanceCleaner
           -c Release
@@ -58,9 +60,10 @@ jobs:
           -p:WindowsPackageType=None
           -p:SelfContained=true
           -p:WindowsAppSDKSelfContained=true
+          -o publish-x86
 
-      # the headline artifacts: ONE exe per architecture, everything bundled inside
-      - name: Publish single-file exe (win-x64)
+      # single-file build (experimental): one exe; kept as a bonus, not the primary download
+      - name: Publish win-x64 (single file, experimental)
         run: >
           dotnet publish src/AttendanceCleaner
           -c Release
@@ -72,34 +75,26 @@ jobs:
           -p:WindowsAppSDKSelfContained=true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:EnableCompressionInSingleFile=true
+          -p:IncludeAllContentForSelfExtract=true
+          -o publish-sf-x64
 
-      - name: Publish single-file exe (win-x86, 32-bit)
-        run: >
-          dotnet publish src/AttendanceCleaner
-          -c Release
-          -f net10.0-windows10.0.19041.0
-          -p:TargetFrameworks=net10.0-windows10.0.19041.0
-          -r win-x86
-          -p:WindowsPackageType=None
-          -p:SelfContained=true
-          -p:WindowsAppSDKSelfContained=true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:EnableCompressionInSingleFile=true
-
-      - name: Rename and stage release files
+      - name: Verify the folder build is complete
         shell: pwsh
         run: |
-          $x64 = 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/AttendanceCleaner.exe'
-          $x86 = 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/AttendanceCleaner.exe'
-          Write-Host "x64 single-file: $([math]::Round((Get-Item $x64).Length/1MB,1)) MB, x86 single-file: $([math]::Round((Get-Item $x86).Length/1MB,1)) MB"
-          Copy-Item $x64 'AttendanceCleaner-x64.exe'
-          Copy-Item $x86 'AttendanceCleaner-x86.exe'
-          Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
-          Compress-Archive -Path 'src/AttendanceCleaner/bin/Release/net10.0-windows10.0.19041.0/win-x86/publish/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+          $runtime = Get-ChildItem 'publish-x64' -Filter 'Microsoft.WindowsAppRuntime*.dll' -ErrorAction SilentlyContinue
+          $exe = Get-Item 'publish-x64/AttendanceCleaner.exe'
+          Write-Host "x64 folder: $((Get-ChildItem 'publish-x64').Count) files, exe is $([math]::Round($exe.Length/1KB)) KB, WinAppSDK runtime DLLs: $($runtime.Count)"
+          if ($runtime.Count -eq 0) { throw 'Folder build is missing the Windows App SDK runtime DLLs - it would not start on a clean PC.' }
+          if ($exe.Length -gt 10MB) { throw 'Folder build exe is unexpectedly large - the single-file output leaked into it.' }
 
-      - name: Create GitHub release with both installers
+      - name: Zip the folder builds
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'publish-x64/*' -DestinationPath 'AttendanceCleaner-win-x64.zip'
+          Compress-Archive -Path 'publish-x86/*' -DestinationPath 'AttendanceCleaner-win-x86.zip'
+          Copy-Item 'publish-sf-x64/AttendanceCleaner.exe' 'AttendanceCleaner-x64.exe'
+
+      - name: Create GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,11 +103,12 @@ jobs:
           $notes = @"
           Attendance Cleaner $tag
 
-          Single-file executables - download and double-click, that's all:
-          - AttendanceCleaner-x64.exe - 64-bit Windows 10/11 (almost every modern PC)
-          - AttendanceCleaner-x86.exe - 32-bit Windows (also runs on 64-bit if unsure which to pick)
+          RECOMMENDED - the zip builds (classic layout, run anywhere):
+          1. Download AttendanceCleaner-win-x64.zip (64-bit) or AttendanceCleaner-win-x86.zip (32-bit)
+          2. Right-click the zip, Extract All
+          3. Open the folder and double-click AttendanceCleaner.exe
+          First launch: if Windows shows a blue SmartScreen warning, click More info, then Run anyway.
 
-          Folder fallbacks for locked-down corporate PCs:
-          - AttendanceCleaner-win-x64.zip / AttendanceCleaner-win-x86.zip
+          BONUS - AttendanceCleaner-x64.exe is a single-file build. Try it if you prefer one file; if it does not start, use the zip above.
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-x64.exe AttendanceCleaner-x86.exe AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest AttendanceCleaner-win-x64.zip AttendanceCleaner-win-x86.zip AttendanceCleaner-x64.exe
