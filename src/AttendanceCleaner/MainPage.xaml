@@ -299,7 +299,13 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                     <Label Text="Converted attendance" FontSize="22" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                    <Label x:Name="SavedLabel" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="2" LineBreakMode="WordWrap" />
+                    <Label x:Name="SavedLabel" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="1" LineBreakMode="TailTruncation" />
+                    <Label x:Name="SavedLocationLabel" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}" TextDecorations="Underline" MaxLines="1" LineBreakMode="TailTruncation">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnSavedLocationTapped" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <Label x:Name="SavedPathLabel" FontSize="10" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="1" LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
                 <Button Grid.Column="1"
                         Text="Convert another file"
@@ -375,13 +381,32 @@
                 <Border.Shadow>
                     <Shadow Brush="Black" Opacity="0.07" Radius="14" />
                 </Border.Shadow>
-                <ScrollView Orientation="Horizontal">
-                    <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
-                        <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
-                                  CachingStrategy="RecycleElement" SeparatorVisibility="None"
-                                  BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                <Grid>
+                    <ScrollView x:Name="DailyTableScroll" Orientation="Horizontal">
+                        <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
+                            <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
+                                      CachingStrategy="RecycleElement" SeparatorVisibility="None"
+                                      BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                        </Grid>
+                    </ScrollView>
+                    <Grid x:Name="MonthlyTableContainer" RowDefinitions="Auto,*" IsVisible="False">
+                        <HorizontalStackLayout Padding="8,6" Spacing="8">
+                            <Button x:Name="MonthlyAttendanceSheetBtn" Text="Attendance" CornerRadius="8" Padding="14,7"
+                                    FontSize="12" FontAttributes="Bold" Clicked="OnMonthlyAttendanceSheetClicked" />
+                            <Button x:Name="MonthlyHolidaySheetBtn" Text="Holiday Details" CornerRadius="8" Padding="14,7"
+                                    FontSize="12" FontAttributes="Bold" Clicked="OnMonthlyHolidaySheetClicked" />
+                        </HorizontalStackLayout>
+                        <ScrollView x:Name="MonthlyTableScroll" Grid.Row="1" Orientation="Both"
+                                    HorizontalScrollBarVisibility="Always" VerticalScrollBarVisibility="Always">
+                            <Grid>
+                                <GraphicsView x:Name="MonthlyPreviewCanvas" />
+                                <Image x:Name="MonthlyTemplateLogoPreview" WidthRequest="47" HeightRequest="30"
+                                       HorizontalOptions="Start" VerticalOptions="Start" Margin="1"
+                                       Aspect="AspectFit" IsVisible="False" />
+                            </Grid>
+                        </ScrollView>
                     </Grid>
-                </ScrollView>
+                </Grid>
             </Border>
 
             <!-- dashboard tab -->

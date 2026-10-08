@@ -21,6 +21,30 @@ public sealed record MonthlyEmployeeSummary(
     decimal TotalOvertimeHours,
     decimal TotalHours);
 
+public sealed record MonthlyWorkbookPreview(IReadOnlyList<MonthlySheetPreview> Sheets);
+
+public sealed record MonthlySheetPreview(
+    string Name,
+    int RowCount,
+    int ColumnCount,
+    IReadOnlyList<double> ColumnWidths,
+    IReadOnlyList<double> RowHeights,
+    IReadOnlyList<MonthlyPreviewCell> Cells);
+
+public sealed record MonthlyPreviewCell(
+    int Row,
+    int Column,
+    int RowSpan,
+    int ColumnSpan,
+    string Text,
+    string? FillColor,
+    string? TextColor,
+    bool Bold,
+    double FontSize,
+    string HorizontalAlignment,
+    string VerticalAlignment,
+    bool WrapText);
+
 /// <summary>Builds the two monthly matrix layouts supplied by the user.</summary>
 public static class MonthlyTemplateWriter
 {
@@ -132,6 +156,87 @@ public static class MonthlyTemplateWriter
         WriteHolidaySheet(workbook.Worksheets.Add("Holiday Details"), holidays, month);
         workbook.SaveAs(output);
     }
+
+    /// <summary>Reads display data and formatting from the exact workbook shown to the user.</summary>
+    public static MonthlyWorkbookPreview ReadPreview(Stream workbookStream)
+    {
+        using var workbook = new XLWorkbook(workbookStream);
+        var sheets = new List<MonthlySheetPreview>();
+        foreach (var worksheet in workbook.Worksheets)
+        {
+            var used = worksheet.RangeUsed(XLCellsUsedOptions.AllContents);
+            if (used is null)
+                continue;
+
+            var firstRow = used.RangeAddress.FirstAddress.RowNumber;
+            var firstColumn = used.RangeAddress.FirstAddress.ColumnNumber;
+            var lastRow = used.RangeAddress.LastAddress.RowNumber;
+            var lastColumn = used.RangeAddress.LastAddress.ColumnNumber;
+            var rowCount = lastRow - firstRow + 1;
+            var columnCount = lastColumn - firstColumn + 1;
+            var mergedAnchors = new Dictionary<(int Row, int Column), (int RowSpan, int ColumnSpan)>();
+            var mergedCells = new HashSet<(int Row, int Column)>();
+
+            foreach (var range in worksheet.MergedRanges)
+            {
+                var rangeFirstRow = range.RangeAddress.FirstAddress.RowNumber;
+                var rangeFirstColumn = range.RangeAddress.FirstAddress.ColumnNumber;
+                var rangeLastRow = range.RangeAddress.LastAddress.RowNumber;
+                var rangeLastColumn = range.RangeAddress.LastAddress.ColumnNumber;
+                mergedAnchors[(rangeFirstRow, rangeFirstColumn)] =
+                    (rangeLastRow - rangeFirstRow + 1, rangeLastColumn - rangeFirstColumn + 1);
+                for (var row = rangeFirstRow; row <= rangeLastRow; row++)
+                for (var column = rangeFirstColumn; column <= rangeLastColumn; column++)
+                {
+                    if (row != rangeFirstRow || column != rangeFirstColumn)
+                        mergedCells.Add((row, column));
+                }
+            }
+
+            var cells = new List<MonthlyPreviewCell>(rowCount * columnCount);
+            for (var row = firstRow; row <= lastRow; row++)
+            for (var column = firstColumn; column <= lastColumn; column++)
+            {
+                if (mergedCells.Contains((row, column)))
+                    continue;
+
+                var cell = worksheet.Cell(row, column);
+                var fillColor = cell.Style.Fill.PatternType == XLFillPatternValues.None
+                    ? null
+                    : ToHtmlColor(cell.Style.Fill.BackgroundColor.Color);
+                var textColor = cell.Style.Font.FontColor.Color.A == 0
+                    ? null
+                    : ToHtmlColor(cell.Style.Font.FontColor.Color);
+                var span = mergedAnchors.GetValueOrDefault((row, column), (RowSpan: 1, ColumnSpan: 1));
+                cells.Add(new MonthlyPreviewCell(
+                    row - firstRow + 1,
+                    column - firstColumn + 1,
+                    span.RowSpan,
+                    span.ColumnSpan,
+                    cell.GetFormattedString(CultureInfo.InvariantCulture),
+                    fillColor,
+                    textColor,
+                    cell.Style.Font.Bold,
+                    cell.Style.Font.FontSize,
+                    cell.Style.Alignment.Horizontal.ToString(),
+                    cell.Style.Alignment.Vertical.ToString(),
+                    cell.Style.Alignment.WrapText));
+            }
+
+            sheets.Add(new MonthlySheetPreview(
+                worksheet.Name,
+                rowCount,
+                columnCount,
+                Enumerable.Range(firstColumn, columnCount).Select(column => worksheet.Column(column).Width).ToArray(),
+                Enumerable.Range(firstRow, rowCount).Select(row => worksheet.Row(row).Height).ToArray(),
+                cells));
+        }
+
+        return new MonthlyWorkbookPreview(sheets);
+    }
+
+    private static string ToHtmlColor(System.Drawing.Color color) =>
+        $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
     private static void WriteAttendanceSheet(
         IXLWorksheet ws,

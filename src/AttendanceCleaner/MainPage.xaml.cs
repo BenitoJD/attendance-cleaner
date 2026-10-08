@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using AttendanceCleaner.Core;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
 using RoundRectangle = Microsoft.Maui.Controls.Shapes.RoundRectangle;
 
 namespace AttendanceCleaner;
@@ -12,6 +13,9 @@ public partial class MainPage : ContentPage
     private FileResult? _selectedFile;
     private Dashboard? _dashboard;
     private IReadOnlyList<TemplateRow>? _convertedRows;
+    private MonthlyWorkbookPreview? _monthlyWorkbookPreview;
+    private string? _lastOutputPath;
+    private MonthlySheetDrawable? _monthlySheetDrawable;
     private string _sourceFileName = "";
     private string _outputDirectory = "";
     private ReportCategory? _selectedCategory;
@@ -31,6 +35,18 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
+        using (var logoStream = typeof(MainPage).Assembly
+            .GetManifestResourceStream("AttendanceCleaner.Core.DakshinakTemplateLogo.png"))
+        {
+            if (logoStream is not null)
+            {
+                using var logoBuffer = new MemoryStream();
+                logoStream.CopyTo(logoBuffer);
+                var logoBytes = logoBuffer.ToArray();
+                MonthlyTemplateLogoPreview.Source = ImageSource.FromStream(
+                    () => new MemoryStream(logoBytes, writable: false));
+            }
+        }
         _holidayCalendarStore = new HolidayCalendarStore(GetHolidayCalendarPath());
         if (Application.Current is { } app)
             app.RequestedThemeChanged += OnRequestedThemeChanged;
@@ -105,8 +121,8 @@ public partial class MainPage : ContentPage
         {
             UpdateTemplateCardSelection();
             UpdateMonthlyTemplateSelection();
-            if (_convertedRows is not null)
-                BuildTable(_convertedRows);
+            if (_convertedRows is not null || _monthlyWorkbookPreview is not null)
+                BuildTable(_convertedRows ?? Array.Empty<TemplateRow>());
             if (_dashboard is not null)
                 BuildDashboard();
             if (HolidayManagerCard.IsVisible)
@@ -555,20 +571,25 @@ public partial class MainPage : ContentPage
                 var built = TemplateWriter.BuildRows(parsed.report.Records);
                 using var ms = new MemoryStream();
                 IReadOnlyList<MonthlyEmployeeSummary>? summaries = null;
+                MonthlyWorkbookPreview? monthlyPreview = null;
                 if (selectedCategory == ReportCategory.Monthly)
                 {
                     var holidays = _holidayCalendarStore.LoadOrSeed();
                     var monthlyKind = selectedMonthlyTemplate!.Value;
                     MonthlyTemplateWriter.Write(parsed.report.Records, holidays, monthlyKind, ms);
+                    var workbookBytes = ms.ToArray();
+                    using var previewStream = new MemoryStream(workbookBytes, writable: false);
+                    monthlyPreview = MonthlyTemplateWriter.ReadPreview(previewStream);
                     summaries = MonthlyTemplateWriter.BuildSummaries(
                         parsed.report.Records, holidays, parsed.dates[0]);
+                    File.WriteAllBytes(outputPath, workbookBytes);
                 }
                 else
                 {
                     TemplateWriter.Write(parsed.report.Records, ms);
+                    File.WriteAllBytes(outputPath, ms.ToArray());
                 }
-                File.WriteAllBytes(outputPath, ms.ToArray());
-                return (Rows: built, Summaries: summaries);
+                return (Rows: built, Summaries: summaries, MonthlyPreview: monthlyPreview);
             });
 
             var rows = conversion.Rows;
@@ -585,7 +606,14 @@ public partial class MainPage : ContentPage
             var templateName = selectedCategory == ReportCategory.Monthly
                 ? selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime ? "Duty + OT" : "IN / OUT"
                 : "Daily";
-            SavedLabel.Text = $"{templateName} · saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
+            SavedLabel.Text = $"{templateName} · saved as {Path.GetFileName(outputPath)}";
+            SavedLocationLabel.Text = DeviceInfo.Platform == DevicePlatform.Android
+                ? "Tap to share or save a copy"
+                : "Tap to open the saved workbook";
+            SavedPathLabel.Text = $"Saved at: {outputPath}";
+            _lastOutputPath = outputPath;
+            _monthlyWorkbookPreview = conversion.MonthlyPreview;
+            _monthlySheetDrawable = null;
             _convertedRows = rows;
             BuildTable(rows);
 
@@ -642,6 +670,35 @@ public partial class MainPage : ContentPage
     private string GetFallbackDirectory() =>
         string.IsNullOrEmpty(_outputDirectory) ? FileSystem.AppDataDirectory : _outputDirectory;
 
+    private async void OnSavedLocationTapped(object? sender, TappedEventArgs e)
+    {
+        var outputPath = _lastOutputPath;
+        if (string.IsNullOrWhiteSpace(outputPath) || !File.Exists(outputPath))
+            return;
+
+        try
+        {
+            var pathToOpen = outputPath;
+#if ANDROID
+            var sharingDirectory = Path.Combine(FileSystem.CacheDirectory, "attendance-report-sharing");
+            Directory.CreateDirectory(sharingDirectory);
+            pathToOpen = Path.Combine(sharingDirectory, Path.GetFileName(outputPath));
+            File.Copy(outputPath, pathToOpen, overwrite: true);
+            await Share.Default.RequestAsync(new ShareFileRequest(
+                "Save or share attendance workbook",
+                new ShareFile(pathToOpen)));
+#else
+            await Launcher.Default.OpenAsync(new OpenFileRequest(
+                "Attendance workbook",
+                new ReadOnlyFile(pathToOpen)));
+#endif
+        }
+        catch (Exception error)
+        {
+            await DisplayAlertAsync("Could not open the workbook", error.Message, "OK");
+        }
+    }
+
     private void OnConvertAnotherClicked(object? sender, EventArgs e)
     {
         ResultsSection.IsVisible = false;
@@ -659,6 +716,12 @@ public partial class MainPage : ContentPage
         UpdateTemplateCardSelection();
         UpdateMonthlyTemplateSelection();
         _convertedRows = null;
+        _monthlyWorkbookPreview = null;
+        _lastOutputPath = null;
+        _monthlySheetDrawable = null;
+        SavedLabel.Text = "";
+        SavedLocationLabel.Text = "";
+        SavedPathLabel.Text = "";
         _dashboard = null;
         ShowTableTab();
     }
@@ -668,6 +731,10 @@ public partial class MainPage : ContentPage
     private void OnTabTableClicked(object? sender, EventArgs e) => ShowTableTab();
 
     private void OnTabDashboardClicked(object? sender, EventArgs e) => ShowDashboardTab();
+
+    private void OnMonthlyAttendanceSheetClicked(object? sender, EventArgs e) => ShowMonthlySheet(0);
+
+    private void OnMonthlyHolidaySheetClicked(object? sender, EventArgs e) => ShowMonthlySheet(1);
 
     private void ShowTableTab()
     {
@@ -860,6 +927,16 @@ public partial class MainPage : ContentPage
     /// is truncated and no width is written in UI code.</summary>
     private void BuildTable(IReadOnlyList<TemplateRow> rows)
     {
+        if (_monthlyWorkbookPreview is { Sheets.Count: > 0 })
+        {
+            DailyTableScroll.IsVisible = false;
+            MonthlyTableContainer.IsVisible = true;
+            ShowMonthlySheet(Math.Clamp(_monthlySheetDrawable?.SheetIndex ?? 0, 0, _monthlyWorkbookPreview.Sheets.Count - 1));
+            return;
+        }
+
+        DailyTableScroll.IsVisible = true;
+        MonthlyTableContainer.IsVisible = false;
         var widths = ComputeColumnWidths(rows);
         TableGrid.WidthRequest = widths.Sum() + 2;
 
@@ -894,6 +971,107 @@ public partial class MainPage : ContentPage
             return new ViewCell { View = grid };
         });
         ItemsView.ItemsSource = rows.Select((r, i) => new DisplayRow(r, i % 2 == 1)).ToList();
+    }
+
+    private void ShowMonthlySheet(int index)
+    {
+        if (_monthlyWorkbookPreview is not { Sheets.Count: > 0 })
+            return;
+
+        index = Math.Clamp(index, 0, _monthlyWorkbookPreview.Sheets.Count - 1);
+        var sheet = _monthlyWorkbookPreview.Sheets[index];
+        _monthlySheetDrawable = new MonthlySheetDrawable(sheet, index);
+        MonthlyPreviewCanvas.Drawable = _monthlySheetDrawable;
+        MonthlyPreviewCanvas.WidthRequest = _monthlySheetDrawable.TotalWidth;
+        MonthlyPreviewCanvas.HeightRequest = _monthlySheetDrawable.TotalHeight;
+        MonthlyPreviewCanvas.Invalidate();
+        MonthlyTemplateLogoPreview.IsVisible = sheet.Name == "Attendance";
+        SetThemeColor(MonthlyAttendanceSheetBtn, Button.BackgroundColorProperty,
+            index == 0 ? "ActionLight" : "SurfaceLight", index == 0 ? "ActionDark" : "SurfaceDark");
+        SetThemeColor(MonthlyAttendanceSheetBtn, Button.TextColorProperty,
+            index == 0 ? "ActionTextLight" : "TextBodyLight", index == 0 ? "ActionTextDark" : "TextBodyDark");
+        SetThemeColor(MonthlyHolidaySheetBtn, Button.BackgroundColorProperty,
+            index == 1 ? "ActionLight" : "SurfaceLight", index == 1 ? "ActionDark" : "SurfaceDark");
+        SetThemeColor(MonthlyHolidaySheetBtn, Button.TextColorProperty,
+            index == 1 ? "ActionTextLight" : "TextBodyLight", index == 1 ? "ActionTextDark" : "TextBodyDark");
+    }
+
+    private sealed class MonthlySheetDrawable : Microsoft.Maui.Graphics.IDrawable
+    {
+        private readonly MonthlySheetPreview _sheet;
+        private readonly float[] _columnPositions;
+        private readonly float[] _rowPositions;
+
+        public int SheetIndex { get; }
+        public float TotalWidth => _columnPositions[^1];
+        public float TotalHeight => _rowPositions[^1];
+
+        public MonthlySheetDrawable(MonthlySheetPreview sheet, int sheetIndex)
+        {
+            _sheet = sheet;
+            SheetIndex = sheetIndex;
+            _columnPositions = new float[sheet.ColumnCount + 1];
+            _rowPositions = new float[sheet.RowCount + 1];
+
+            for (var column = 0; column < sheet.ColumnCount; column++)
+                _columnPositions[column + 1] = _columnPositions[column] + ToDeviceColumnWidth(sheet.ColumnWidths[column]);
+            for (var row = 0; row < sheet.RowCount; row++)
+                _rowPositions[row + 1] = _rowPositions[row] + ToDeviceRowHeight(sheet.RowHeights[row]);
+        }
+
+        public void Draw(Microsoft.Maui.Graphics.ICanvas canvas, Microsoft.Maui.Graphics.RectF dirtyRect)
+        {
+            canvas.SaveState();
+            canvas.FillColor = Microsoft.Maui.Graphics.Colors.White;
+            canvas.FillRectangle(0, 0, TotalWidth, TotalHeight);
+            foreach (var cell in _sheet.Cells)
+            {
+                var x = _columnPositions[cell.Column - 1];
+                var y = _rowPositions[cell.Row - 1];
+                var width = _columnPositions[Math.Min(_sheet.ColumnCount, cell.Column - 1 + cell.ColumnSpan)] - x;
+                var height = _rowPositions[Math.Min(_sheet.RowCount, cell.Row - 1 + cell.RowSpan)] - y;
+                var rect = new Microsoft.Maui.Graphics.RectF(x, y, width, height);
+
+                canvas.FillColor = ParseColor(cell.FillColor, "#FFFFFF");
+                canvas.FillRectangle(rect);
+                canvas.StrokeColor = Microsoft.Maui.Graphics.Color.FromArgb("#A6A6A6");
+                canvas.StrokeSize = 0.7f;
+                canvas.DrawRectangle(rect);
+
+                if (string.IsNullOrEmpty(cell.Text))
+                    continue;
+
+                canvas.Font = cell.Bold
+                    ? Microsoft.Maui.Graphics.Font.DefaultBold
+                    : Microsoft.Maui.Graphics.Font.Default;
+                canvas.FontSize = (float)Math.Clamp(cell.FontSize * 1.05, 9, 16);
+                canvas.FontColor = ParseColor(cell.TextColor, "#111111");
+                var horizontal = cell.HorizontalAlignment switch
+                {
+                    "Center" => Microsoft.Maui.Graphics.HorizontalAlignment.Center,
+                    "Right" => Microsoft.Maui.Graphics.HorizontalAlignment.Right,
+                    _ => Microsoft.Maui.Graphics.HorizontalAlignment.Left,
+                };
+                var vertical = cell.VerticalAlignment switch
+                {
+                    "Top" => Microsoft.Maui.Graphics.VerticalAlignment.Top,
+                    "Bottom" => Microsoft.Maui.Graphics.VerticalAlignment.Bottom,
+                    _ => Microsoft.Maui.Graphics.VerticalAlignment.Center,
+                };
+                canvas.DrawString(cell.Text,
+                    x + 3, y + 1, Math.Max(0, width - 6), Math.Max(0, height - 2), horizontal, vertical);
+            }
+            canvas.RestoreState();
+        }
+
+        private static float ToDeviceColumnWidth(double excelWidth) =>
+            (float)Math.Clamp(excelWidth * 7.1, 38, 190);
+
+        private static float ToDeviceRowHeight(double excelHeight) =>
+            (float)Math.Clamp(excelHeight * 1.35, 22, 44);
+
+        private static Microsoft.Maui.Graphics.Color ParseColor(string? color, string fallback) =>
+            Microsoft.Maui.Graphics.Color.FromArgb(string.IsNullOrWhiteSpace(color) ? fallback : color);
     }
 
     private static double[] ComputeColumnWidths(IReadOnlyList<TemplateRow> rows)
