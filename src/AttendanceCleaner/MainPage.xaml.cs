@@ -7,6 +7,9 @@ namespace AttendanceCleaner;
 public partial class MainPage : ContentPage
 {
     private FileResult? _selectedFile;
+    private Dashboard? _dashboard;
+    private string _sourceFileName = "";
+    private string _outputDirectory = "";
 
     public MainPage()
     {
@@ -98,8 +101,9 @@ public partial class MainPage : ContentPage
 
             // 2. let the user choose where to save it
             StatusLabel.Text = "Choose where to save the clean Excel...";
-            var outputPath = await AskForSaveLocationAsync(parsed.fileName)
+            var outputPath = await AskForSaveLocationAsync(parsed.fileName, ".xlsx")
                 ?? Path.Combine(GetFallbackDirectory(), parsed.fileName);
+            _outputDirectory = Path.GetDirectoryName(outputPath) ?? "";
 
             // 3. generate the workbook and write it
             StatusLabel.Text = "Converting...";
@@ -124,6 +128,11 @@ public partial class MainPage : ContentPage
             SavedLabel.Text = $"Saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
             BuildTable(rows);
 
+            _dashboard = AttendanceAnalytics.Build(parsed.report.Records);
+            _sourceFileName = Path.GetFileName(outputPath);
+            BuildDashboard();
+
+            ShowTableTab();
             ConvertSection.IsVisible = false;
             ResultsSection.IsVisible = true;
             _selectedFile = null;
@@ -142,8 +151,8 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>Windows: native "Save as" dialog so the user picks their own location.
-    /// Elsewhere: null (the caller saves next to the input file).</summary>
-    private async Task<string?> AskForSaveLocationAsync(string fileName)
+    /// Elsewhere: null (the caller uses the fallback directory).</summary>
+    private async Task<string?> AskForSaveLocationAsync(string fileName, string extension)
     {
 #if WINDOWS
         if (this.Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window nativeWindow)
@@ -152,8 +161,10 @@ public partial class MainPage : ContentPage
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow));
             picker.SuggestedFileName = Path.GetFileNameWithoutExtension(fileName);
             picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
-            picker.DefaultFileExtension = ".xlsx";
-            picker.FileTypeChoices.Add("Excel workbook", new List<string> { ".xlsx" });
+            picker.DefaultFileExtension = extension;
+            picker.FileTypeChoices.Add(
+                extension == ".pdf" ? "PDF report" : "Excel workbook",
+                new List<string> { extension });
 
             var file = await picker.PickSaveFileAsync();
             return file?.Path;
@@ -162,11 +173,8 @@ public partial class MainPage : ContentPage
         return null;
     }
 
-    private string GetFallbackDirectory()
-    {
-        var directory = Path.GetDirectoryName(_selectedFile?.FullPath);
-        return string.IsNullOrEmpty(directory) ? FileSystem.AppDataDirectory : directory;
-    }
+    private string GetFallbackDirectory() =>
+        string.IsNullOrEmpty(_outputDirectory) ? FileSystem.AppDataDirectory : _outputDirectory;
 
     private void OnConvertAnotherClicked(object? sender, EventArgs e)
     {
@@ -175,6 +183,178 @@ public partial class MainPage : ContentPage
         FileNameLabel.Text = "";
         StatusLabel.Text = "";
         ConvertBtn.IsEnabled = false;
+        ShowTableTab();
+    }
+
+    // --- tabs ---
+
+    private void OnTabTableClicked(object? sender, EventArgs e) => ShowTableTab();
+
+    private void OnTabDashboardClicked(object? sender, EventArgs e) => ShowDashboardTab();
+
+    private void ShowTableTab()
+    {
+        TableCard.IsVisible = true;
+        DashboardSection.IsVisible = false;
+        SavePdfBtn.IsVisible = false;
+        TabTableBtn.BackgroundColor = Color.FromArgb("#059669");
+        TabTableBtn.TextColor = Colors.White;
+        TabDashboardBtn.BackgroundColor = Colors.White;
+        TabDashboardBtn.TextColor = Color.FromArgb("#374151");
+    }
+
+    private void ShowDashboardTab()
+    {
+        TableCard.IsVisible = false;
+        DashboardSection.IsVisible = true;
+        SavePdfBtn.IsVisible = true;
+        TabDashboardBtn.BackgroundColor = Color.FromArgb("#059669");
+        TabDashboardBtn.TextColor = Colors.White;
+        TabTableBtn.BackgroundColor = Colors.White;
+        TabTableBtn.TextColor = Color.FromArgb("#374151");
+    }
+
+    // --- dashboard ---
+
+    private void BuildDashboard()
+    {
+        if (_dashboard is null) return;
+        var d = _dashboard;
+
+        DashEmployees.Text = $"{d.EmployeeCount}";
+        DashAvgIn.Text = d.AverageIn ?? "-";
+        DashAvgOut.Text = d.AverageOut ?? "-";
+        DashAvgHours.Text = d.AverageHours ?? "-";
+        DashStatus.Text = "";
+
+        BuildChart(d);
+        BuildEmployeeTable(d);
+    }
+
+    private void BuildChart(Dashboard d)
+    {
+        var grid = new Grid { VerticalOptions = LayoutOptions.End };
+        var max = Math.Max(1, d.Days.Max(x => Math.Max(x.Present, x.Absent)));
+
+        foreach (var day in d.Days)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(18));
+            var column = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 0 };
+            column.Add(new BoxView
+            {
+                Color = Color.FromArgb("#059669"),
+                HeightRequest = Math.Max(1, 100.0 * day.Present / max),
+                WidthRequest = 14,
+                HorizontalOptions = LayoutOptions.Center,
+            });
+            if (day.Absent > 0)
+            {
+                column.Add(new BoxView
+                {
+                    Color = Color.FromArgb("#FCA5A5"),
+                    HeightRequest = Math.Max(1, 100.0 * day.Absent / max),
+                    WidthRequest = 14,
+                    HorizontalOptions = LayoutOptions.Center,
+                });
+            }
+            column.Add(new Label
+            {
+                Text = day.Date.Day.ToString(CultureInfo.InvariantCulture),
+                FontSize = 8,
+                TextColor = Color.FromArgb("#6B7280"),
+                HorizontalTextAlignment = TextAlignment.Center,
+                Padding = new Thickness(0, 3, 0, 0),
+            });
+            grid.Add(column, grid.ColumnDefinitions.Count - 1);
+        }
+        DashChartGrid.Children.Clear();
+        DashChartGrid.Add(grid);
+        Grid.SetColumn(grid, 0);
+    }
+
+    private void BuildEmployeeTable(Dashboard d)
+    {
+        var headers = new[] { "ID", "Name", "Present", "Absent", "In only", "Avg in", "Avg out", "Avg hrs", "Rate" };
+        string[] Row(EmployeeSummary e) => new[]
+        {
+            e.Id, e.Name,
+            e.PresentDays.ToString(CultureInfo.InvariantCulture),
+            e.AbsentDays.ToString(CultureInfo.InvariantCulture),
+            e.InPunchOnlyDays.ToString(CultureInfo.InvariantCulture),
+            e.AverageIn ?? "-", e.AverageOut ?? "-", e.AverageHours ?? "-",
+            $"{e.AttendanceRate:0}%",
+        };
+
+        var widths = new double[headers.Length];
+        for (var c = 0; c < headers.Length; c++)
+        {
+            var longest = d.Employees.Select(e => Row(e)[c].Length).Prepend(headers[c].Length).DefaultIfEmpty(0).Max();
+            widths[c] = Math.Clamp(longest * 7.4 + 16, 40, 220);
+        }
+
+        View RowView(string[] cells, bool header, bool alt)
+        {
+            var g = new Grid { BackgroundColor = header ? Color.FromArgb("#059669") : alt ? Color.FromArgb("#F4F8F7") : Colors.White };
+            for (var c = 0; c < headers.Length; c++)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition(widths[c]));
+                g.Add(new Label
+                {
+                    Text = cells[c],
+                    FontSize = 12,
+                    FontAttributes = header ? FontAttributes.Bold : FontAttributes.None,
+                    TextColor = header ? Colors.White : Color.FromArgb("#1F2937"),
+                    Padding = new Thickness(6, header ? 10 : 8),
+                    HorizontalTextAlignment = c == 1 ? TextAlignment.Start : TextAlignment.Center,
+                    VerticalTextAlignment = TextAlignment.Center,
+                }, c);
+            }
+            return g;
+        }
+
+        DashEmployeeTable.Clear();
+        DashEmployeeTable.WidthRequest = widths.Sum() + 2;
+        DashEmployeeTable.Add(RowView(headers, header: true, alt: false));
+        foreach (var (e, i) in d.Employees.Select((e, i) => (e, i)))
+        {
+            DashEmployeeTable.Add(RowView(Row(e), header: false, alt: i % 2 == 1));
+        }
+    }
+
+    // --- save dashboard as PDF ---
+
+    private async void OnSavePdfClicked(object? sender, EventArgs e)
+    {
+        if (_dashboard is null) return;
+
+        SavePdfBtn.IsEnabled = false;
+        DashStatus.Text = "Preparing PDF...";
+
+        try
+        {
+            var suggested = $"Attendance Dashboard {_dashboard.From:MMMM yyyy}.pdf";
+            var bytes = await Task.Run(() => DashboardPdf.Build(_dashboard, _sourceFileName));
+
+            var outputPath = await AskForSaveLocationAsync(suggested, ".pdf")
+                ?? Path.Combine(GetFallbackDirectory(), suggested);
+
+            await Task.Run(() => File.WriteAllBytes(outputPath, bytes));
+            DashStatus.Text = $"Dashboard saved to: {outputPath}";
+        }
+        catch (TypeInitializationException)
+        {
+            // QuestPDF's native renderer is unavailable on this platform (e.g. Android);
+            // the Windows build - the deployment target - is unaffected.
+            DashStatus.Text = "PDF export is supported in the Windows version of the app.";
+        }
+        catch (Exception ex)
+        {
+            DashStatus.Text = $"Could not save the PDF: {ex.Message}";
+        }
+        finally
+        {
+            SavePdfBtn.IsEnabled = true;
+        }
     }
 
     private Grid? _headerRow;

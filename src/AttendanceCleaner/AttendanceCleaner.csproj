@@ -64,6 +64,9 @@
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
 
+		<!-- PDF font for the dashboard report (registered with QuestPDF at runtime) -->
+		<EmbeddedResource Include="Resources\Fonts\OpenSans-Regular.ttf" LogicalName="AttendanceCleaner.Core.OpenSans.ttf" />
+
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
@@ -73,6 +76,7 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="ClosedXML" Version="0.105.1" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
+		<PackageReference Include="QuestPDF" Version="2026.9.1" />
 	</ItemGroup>
 
 </Project>

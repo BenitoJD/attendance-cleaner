@@ -71,10 +71,10 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- ═══════════ results screen: stat cards + table card ═══════════ -->
+        <!-- ═══════════ results screen: stat cards + tabs (table / dashboard) ═══════════ -->
         <Grid x:Name="ResultsSection"
               IsVisible="False"
-              RowDefinitions="Auto,Auto,*"
+              RowDefinitions="Auto,Auto,Auto,*"
               Padding="20"
               RowSpacing="12">
 
@@ -132,13 +132,38 @@
                 </Border>
             </HorizontalStackLayout>
 
-            <Border Grid.Row="2" Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+            <!-- segmented tabs: Table | Dashboard + save-PDF -->
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+                <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White" StrokeShape="RoundRectangle 12" Padding="4">
+                    <HorizontalStackLayout Spacing="4">
+                        <Button x:Name="TabTableBtn" Text="Table" CornerRadius="9" Padding="18,8"
+                                FontSize="13" FontAttributes="Bold"
+                                BackgroundColor="#059669" TextColor="White"
+                                Clicked="OnTabTableClicked" />
+                        <Button x:Name="TabDashboardBtn" Text="Dashboard" CornerRadius="9" Padding="18,8"
+                                FontSize="13" FontAttributes="Bold"
+                                BackgroundColor="White" TextColor="#374151"
+                                Clicked="OnTabDashboardClicked" />
+                    </HorizontalStackLayout>
+                </Border>
+                <Button Grid.Column="2" x:Name="SavePdfBtn"
+                        Text="Save dashboard as PDF"
+                        BackgroundColor="White" TextColor="#DC2626"
+                        BorderColor="#DC2626" BorderWidth="1"
+                        FontSize="13" FontAttributes="Bold"
+                        CornerRadius="12" Padding="16,10"
+                        HorizontalOptions="End"
+                        IsVisible="False"
+                        Clicked="OnSavePdfClicked" />
+            </Grid>
+
+            <!-- table tab (the converted rows, like the Excel sheet) -->
+            <Border x:Name="TableCard" Grid.Row="3" Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
                     StrokeShape="RoundRectangle 16" Padding="0"
                     HorizontalOptions="Fill" VerticalOptions="Fill">
                 <Border.Shadow>
                     <Shadow Brush="Black" Opacity="0.07" Radius="14" />
                 </Border.Shadow>
-                <!-- header + rows scroll horizontally together -->
                 <ScrollView Orientation="Horizontal">
                     <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
                         <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
@@ -146,6 +171,81 @@
                     </Grid>
                 </ScrollView>
             </Border>
+
+            <!-- dashboard tab -->
+            <ScrollView x:Name="DashboardSection" Grid.Row="3" IsVisible="False">
+                <VerticalStackLayout Spacing="12">
+
+                    <HorizontalStackLayout Spacing="10">
+                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                                StrokeShape="RoundRectangle 16" Padding="16,10">
+                            <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                            <VerticalStackLayout Spacing="0">
+                                <Label x:Name="DashEmployees" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
+                                <Label Text="employees" FontSize="11" TextColor="#6B7280" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                                StrokeShape="RoundRectangle 16" Padding="16,10">
+                            <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                            <VerticalStackLayout Spacing="0">
+                                <Label x:Name="DashAvgIn" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
+                                <Label Text="avg in" FontSize="11" TextColor="#6B7280" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                                StrokeShape="RoundRectangle 16" Padding="16,10">
+                            <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                            <VerticalStackLayout Spacing="0">
+                                <Label x:Name="DashAvgOut" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
+                                <Label Text="avg out" FontSize="11" TextColor="#6B7280" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                                StrokeShape="RoundRectangle 16" Padding="16,10">
+                            <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
+                            <VerticalStackLayout Spacing="0">
+                                <Label x:Name="DashAvgHours" FontSize="20" FontAttributes="Bold" TextColor="#111827" />
+                                <Label Text="avg hours" FontSize="11" TextColor="#6B7280" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </HorizontalStackLayout>
+
+                    <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                            StrokeShape="RoundRectangle 16" Padding="14">
+                        <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Daily attendance" FontSize="13" FontAttributes="Bold" TextColor="#111827" />
+                            <HorizontalStackLayout Spacing="12">
+                                <HorizontalStackLayout Spacing="4">
+                                    <BoxView Color="#059669" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
+                                    <Label Text="present" FontSize="11" TextColor="#6B7280" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Spacing="4">
+                                    <BoxView Color="#FCA5A5" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
+                                    <Label Text="absent" FontSize="11" TextColor="#6B7280" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </HorizontalStackLayout>
+                            <ScrollView Orientation="Horizontal" HeightRequest="150">
+                                <Grid x:Name="DashChartGrid" ColumnSpacing="2" VerticalOptions="End" />
+                            </ScrollView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Stroke="#E2E8F0" StrokeThickness="1" BackgroundColor="White"
+                            StrokeShape="RoundRectangle 16" Padding="10">
+                        <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Employee summary" FontSize="13" FontAttributes="Bold" TextColor="#111827" Padding="6,0" />
+                            <ScrollView Orientation="Horizontal">
+                                <StackLayout x:Name="DashEmployeeTable" Spacing="0" />
+                            </ScrollView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label x:Name="DashStatus" Text="" FontSize="12" TextColor="#6B7280" />
+                </VerticalStackLayout>
+            </ScrollView>
         </Grid>
 
         <ActivityIndicator x:Name="Spinner"
