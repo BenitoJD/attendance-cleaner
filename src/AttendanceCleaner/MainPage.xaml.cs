@@ -612,7 +612,7 @@ public partial class MainPage : ContentPage
             var templateName = selectedCategory == ReportCategory.Monthly
                 ? selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime ? "Duty + OT" : "IN / OUT"
                 : "Daily";
-            SavedLabel.Text = $"{templateName} · saved as {Path.GetFileName(outputPath)}";
+            SavedLabel.Text = $"{templateName} · {Path.GetFileName(outputPath)}";
             SavedLocationLabel.Text = DeviceInfo.Platform == DevicePlatform.Android
                 ? "Tap to share or save a copy"
                 : "Tap to open the saved workbook";

@@ -289,52 +289,86 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- ═══════════ results screen: stat cards + tabs (table / dashboard) ═══════════ -->
+        <!-- ═══════════ results screen: saved report summary + tabs ═══════════ -->
         <Grid x:Name="ResultsSection" Grid.Row="1"
               IsVisible="False"
-              RowDefinitions="Auto,Auto,Auto,*"
+              RowDefinitions="Auto,Auto,*"
               Padding="20"
               RowSpacing="12">
 
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                    <Label Text="Converted attendance" FontSize="22" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                    <Label x:Name="SavedLabel" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="1" LineBreakMode="TailTruncation" />
-                    <Label x:Name="SavedLocationLabel" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}" TextDecorations="Underline" MaxLines="1" LineBreakMode="TailTruncation">
-                        <Label.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnSavedLocationTapped" />
-                        </Label.GestureRecognizers>
-                    </Label>
-                    <Label x:Name="SavedPathLabel" FontSize="10" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="1" LineBreakMode="TailTruncation" />
-                    <Label x:Name="ConversionWarningLabel" FontSize="10"
+            <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                    StrokeThickness="1"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                    StrokeShape="RoundRectangle 18"
+                    Padding="16">
+                <Grid ColumnDefinitions="Auto,*,Auto"
+                      RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                      ColumnSpacing="12"
+                      RowSpacing="6">
+                    <Border Grid.RowSpan="5"
+                            WidthRequest="38" HeightRequest="38"
+                            StrokeThickness="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
+                            StrokeShape="RoundRectangle 12"
+                            VerticalOptions="Start">
+                        <Label Text="✓" FontSize="21" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
+                               HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Border>
+
+                    <Label Grid.Column="1" Text="Report ready" FontSize="20" FontAttributes="Bold"
+                           VerticalTextAlignment="Center"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+
+                    <Button Grid.Column="2" Grid.Row="0"
+                            Text="Convert another file"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                            TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
+                            BorderColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                            BorderWidth="1" FontSize="13" FontAttributes="Bold"
+                            CornerRadius="12" Padding="16,10"
+                            VerticalOptions="Center" HorizontalOptions="End"
+                            Clicked="OnConvertAnotherClicked" />
+
+                    <Label x:Name="SavedLabel" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                           FontSize="13"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                           MaxLines="2" LineBreakMode="TailTruncation" />
+
+                    <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Spacing="10" VerticalOptions="Center">
+                        <Border StrokeThickness="0"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
+                                StrokeShape="RoundRectangle 9" Padding="9,5">
+                            <HorizontalStackLayout Spacing="5" VerticalOptions="Center">
+                                <Label x:Name="StatTotal" FontSize="14" FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}" />
+                                <Label x:Name="StatTotalLabel" Text="rows" FontSize="11"
+                                       TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}" />
+                            </HorizontalStackLayout>
+                        </Border>
+                        <Label x:Name="SavedLocationLabel" FontSize="12" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                               TextDecorations="Underline" MaxLines="1" LineBreakMode="TailTruncation"
+                               VerticalTextAlignment="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnSavedLocationTapped" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </HorizontalStackLayout>
+
+                    <Label x:Name="SavedPathLabel" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
+                           FontSize="10"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                           MaxLines="1" LineBreakMode="TailTruncation" />
+                    <Label x:Name="ConversionWarningLabel" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
+                           FontSize="11"
                            TextColor="{AppThemeBinding Light=#92400E, Dark=#FCD34D}"
                            MaxLines="2" LineBreakMode="WordWrap" IsVisible="False" />
-                </VerticalStackLayout>
-                <Button Grid.Column="1"
-                        Text="Convert another file"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
-                        BorderColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}" BorderWidth="1"
-                        FontSize="13" FontAttributes="Bold"
-                        CornerRadius="12" Padding="16,10"
-                        VerticalOptions="Center"
-                        Clicked="OnConvertAnotherClicked" />
-            </Grid>
-
-            <HorizontalStackLayout Grid.Row="1" Spacing="10">
-
-                <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                        StrokeShape="RoundRectangle 16" Padding="16,10" >
-                    <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
-                    <VerticalStackLayout Spacing="0">
-                        <Label x:Name="StatTotal" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Label x:Name="StatTotalLabel" Text="rows" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    </VerticalStackLayout>
-                </Border>
-
-            </HorizontalStackLayout>
+                </Grid>
+            </Border>
 
             <!-- segmented tabs: Table | Dashboard + save-PDF -->
-            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
                 <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" StrokeShape="RoundRectangle 12" Padding="4">
                     <HorizontalStackLayout Spacing="4">
                         <Button x:Name="TabTableBtn" Text="Table" CornerRadius="9" Padding="18,8"
@@ -360,7 +394,7 @@
             </Grid>
 
             <!-- table tab (the converted rows, like the Excel sheet) -->
-            <Border x:Name="TableCard" Grid.Row="3" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+            <Border x:Name="TableCard" Grid.Row="2" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                     StrokeShape="RoundRectangle 16" Padding="0"
                     HorizontalOptions="Fill" VerticalOptions="Fill">
                 <Border.Shadow>
@@ -395,7 +429,7 @@
             </Border>
 
             <!-- dashboard tab -->
-            <ScrollView x:Name="DashboardSection" Grid.Row="3" IsVisible="False">
+            <ScrollView x:Name="DashboardSection" Grid.Row="2" IsVisible="False">
                 <VerticalStackLayout Spacing="12">
 
                     <HorizontalStackLayout Spacing="10">
