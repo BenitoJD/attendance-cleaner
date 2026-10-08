@@ -213,4 +213,4 @@ jobs:
           - AttendanceReportStudio-win-x64.zip - 64-bit Windows 10/11 (almost every modern PC)
           - AttendanceReportStudio-win-x86.zip - 32-bit Windows (also runs on 64-bit Windows if unsure which to pick)
           "@
-          gh release create $tag --title $tag --notes $notes --latest AttendanceReportStudio-Setup-x64.exe AttendanceReportStudio-Setup-x86.exe AttendanceReportStudio-win-x64.zip AttendanceReportStudio-win-x86.zip
+          gh release create $tag --title $tag --notes $notes --latest build-artifacts/AttendanceReportStudio-Setup-x64.exe build-artifacts/AttendanceReportStudio-Setup-x86.exe AttendanceReportStudio-win-x64.zip AttendanceReportStudio-win-x86.zip
