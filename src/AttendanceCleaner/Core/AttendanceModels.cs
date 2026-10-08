@@ -8,7 +8,10 @@ public sealed record AttendanceRecord(
     DateOnly Date,
     string? InPunch,
     string? OutPunch,
-    int Order);
+    int Order,
+    string? Attended = null,
+    string? Overtime = null,
+    string? Status = null);
 
 /// <summary>The result of parsing an attendance export.</summary>
 public sealed record ParsedReport(

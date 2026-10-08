@@ -51,4 +51,6 @@ public static class TemplateSpec
 
     public const string DailyFileName = "Attendance_{0:dd-MM-yyyy}.xlsx";
     public const string MonthlyFileName = "Attendance_{0:MMMM yyyy}.xlsx";
+    public const string MonthlyDutyOvertimeFileName = "Attendance_Duty_OT_{0:MMMM_yyyy}.xlsx";
+    public const string MonthlyInOutFileName = "Attendance_IN_OUT_{0:MMMM_yyyy}.xlsx";
 }

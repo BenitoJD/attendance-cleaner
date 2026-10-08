@@ -120,6 +120,89 @@
                         </Grid>
                     </Border>
 
+                    <Border x:Name="MonthlyOptionsPanel" IsVisible="False"
+                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                            StrokeShape="RoundRectangle 18" Padding="15">
+                        <VerticalStackLayout Spacing="12">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="MONTHLY TEMPLATES" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
+                                       TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
+                                <Label Text="Choose the layout for your monthly attendance export." FontSize="13"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Border x:Name="DutyOvertimeCard"
+                                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                                        StrokeShape="RoundRectangle 14" Padding="12">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="Duty + OT" FontSize="15" FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                        <Label Text="Daily duty and overtime hours with monthly totals." FontSize="11"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                        <Button x:Name="MonthlyDutyButton" Text="Use this template"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                                                FontSize="12" FontAttributes="Bold" CornerRadius="10" Padding="10,8"
+                                                Clicked="OnDutyOvertimeTemplateClicked" />
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border x:Name="InOutCard" Grid.Column="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                                        StrokeShape="RoundRectangle 14" Padding="12">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="IN / OUT" FontSize="15" FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                        <Label Text="Daily punch times with monthly attendance totals." FontSize="11"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                        <Button x:Name="MonthlyInOutButton" Text="Use this template"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                                                FontSize="12" FontAttributes="Bold" CornerRadius="10" Padding="10,8"
+                                                Clicked="OnInOutTemplateClicked" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                            <Button x:Name="ManageHolidaysButton" Text="Manage holiday details"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
+                                    FontSize="13" FontAttributes="Bold" CornerRadius="11" Padding="12,10"
+                                    Clicked="OnManageHolidaysClicked" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border x:Name="HolidayManagerCard" IsVisible="False"
+                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                            StrokeShape="RoundRectangle 18" Padding="15">
+                        <VerticalStackLayout Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="3">
+                                    <Label Text="Holiday details" FontSize="18" FontAttributes="Bold"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                                    <Label Text="Edit the 2026 list or add your own dates. Changes save automatically on this device."
+                                           FontSize="12" LineBreakMode="WordWrap"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="Back" FontSize="12" FontAttributes="Bold" Padding="12,8"
+                                        CornerRadius="10"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}"
+                                        TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
+                                        Clicked="OnHolidayManagerBackClicked" />
+                            </Grid>
+                            <Button x:Name="AddHolidayButton" Text="+ Add holiday"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                                    FontSize="13" FontAttributes="Bold" CornerRadius="11" Padding="12,9"
+                                    Clicked="OnAddHolidayClicked" />
+                            <VerticalStackLayout x:Name="HolidayRowsLayout" Spacing="8" />
+                            <Label x:Name="HolidaySaveStatus" Text="" FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </VerticalStackLayout>
+                    </Border>
+
                 </VerticalStackLayout>
 
                 <Border x:Name="UploadCard" IsVisible="False"
@@ -207,7 +290,7 @@
                     <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
                     <VerticalStackLayout Spacing="0">
                         <Label x:Name="StatTotal" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Label Text="rows" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        <Label x:Name="StatTotalLabel" Text="rows" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
 

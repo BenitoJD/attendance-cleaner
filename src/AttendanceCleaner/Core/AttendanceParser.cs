@@ -25,6 +25,8 @@ public static partial class AttendanceParser
     private const string LabelDate = "Date";
     private const string LabelCheckIn = "Check-in1";
     private const string LabelCheckOut = "Check-out1";
+    private const string LabelAttended = "Attended";
+    private const string LabelOvertime = "OT";
     private const string LabelCheckInPrefix = "Check-in";
     private const string LabelStatus = "Status";
 
@@ -148,7 +150,7 @@ public static partial class AttendanceParser
 
         int blockIndex = -1;
         Dictionary<int, int>? dayByColumn = null;
-        Dictionary<int, string>? ins = null, outs = null;
+        Dictionary<int, string>? ins = null, outs = null, attended = null, overtime = null, statuses = null;
         string id = "", name = "";
 
         void Flush()
@@ -161,8 +163,12 @@ public static partial class AttendanceParser
                 var date = MapColumnToDate(from, i, dayNumber);
                 ins!.TryGetValue(col, out var tin);
                 outs!.TryGetValue(col, out var tout);
+                attended!.TryGetValue(col, out var totalHours);
+                overtime!.TryGetValue(col, out var otHours);
+                statuses!.TryGetValue(col, out var status);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
-                    NormalizePunch(tin), NormalizePunch(tout), Order: blockIndex));
+                    NormalizePunch(tin), NormalizePunch(tout), Order: blockIndex,
+                    Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
             }
         }
 
@@ -176,6 +182,9 @@ public static partial class AttendanceParser
                 dayByColumn = null;
                 ins = new Dictionary<int, string>();
                 outs = new Dictionary<int, string>();
+                attended = new Dictionary<int, string>();
+                overtime = new Dictionary<int, string>();
+                statuses = new Dictionary<int, string>();
                 (id, name) = ExtractBlockIdentity(row);
             }
             else if (Same(label, LabelDate) && blockIndex >= 0)
@@ -197,8 +206,17 @@ public static partial class AttendanceParser
             {
                 foreach (var col in dayByColumn.Keys) outs![col] = Cell(row, col);
             }
+            else if (Same(label, LabelAttended) && dayByColumn != null)
+            {
+                foreach (var col in dayByColumn.Keys) attended![col] = Cell(row, col);
+            }
+            else if (IsOvertimeLabel(label) && dayByColumn != null)
+            {
+                foreach (var col in dayByColumn.Keys) overtime![col] = Cell(row, col);
+            }
             else if (Same(label, LabelStatus) && dayByColumn != null)
             {
+                foreach (var col in dayByColumn.Keys) statuses![col] = Cell(row, col);
                 Flush();
                 dayByColumn = null;
             }
@@ -267,7 +285,10 @@ public static partial class AttendanceParser
             var label = Cell(row, labelColumn);
             var isCheckIn = Same(label, LabelCheckIn);
             var isCheckOut = Same(label, LabelCheckOut);
-            if (!isCheckIn && !isCheckOut) continue;
+            var isAttended = Same(label, LabelAttended);
+            var isOvertime = IsOvertimeLabel(label);
+            var isStatus = Same(label, LabelStatus);
+            if (!isCheckIn && !isCheckOut && !isAttended && !isOvertime && !isStatus) continue;
             if (!int.TryParse(Cell(row, ixNo), out var no)) continue;
 
             var key = $"{Cell(row, ixNo)}|{Cell(row, ixId)}|{Cell(row, ixName)}";
@@ -279,7 +300,12 @@ public static partial class AttendanceParser
             }
             var values = new Dictionary<int, string>();
             foreach (var col in dayColumns) values[col] = Cell(row, col);
-            metrics[isCheckIn ? LabelCheckIn : LabelCheckOut] = values;
+            var metricName = isCheckIn ? LabelCheckIn
+                : isCheckOut ? LabelCheckOut
+                : isAttended ? LabelAttended
+                : isOvertime ? LabelOvertime
+                : LabelStatus;
+            metrics[metricName] = values;
         }
 
         var records = new List<AttendanceRecord>();
@@ -289,6 +315,9 @@ public static partial class AttendanceParser
             string id = parts[1], name = parts[2];
             var ins = metrics.GetValueOrDefault(LabelCheckIn) ?? new Dictionary<int, string>();
             var outs = metrics.GetValueOrDefault(LabelCheckOut) ?? new Dictionary<int, string>();
+            var attended = metrics.GetValueOrDefault(LabelAttended) ?? new Dictionary<int, string>();
+            var overtime = metrics.GetValueOrDefault(LabelOvertime) ?? new Dictionary<int, string>();
+            var statuses = metrics.GetValueOrDefault(LabelStatus) ?? new Dictionary<int, string>();
             for (var i = 0; i < dayColumns.Count; i++)
             {
                 var col = dayColumns[i];
@@ -296,8 +325,12 @@ public static partial class AttendanceParser
                 var date = MapColumnToDate(from, i, dayNumber);
                 ins.TryGetValue(col, out var tin);
                 outs.TryGetValue(col, out var tout);
+                attended.TryGetValue(col, out var totalHours);
+                overtime.TryGetValue(col, out var otHours);
+                statuses.TryGetValue(col, out var status);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
-                    NormalizePunch(tin), NormalizePunch(tout), Order: order[key]));
+                    NormalizePunch(tin), NormalizePunch(tout), Order: order[key],
+                    Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
             }
         }
         return records;
@@ -368,6 +401,15 @@ public static partial class AttendanceParser
 
     private static int FindIndex(List<string> row, string value) =>
         row.FindIndex(c => Same(c, value));
+
+    private static bool IsOvertimeLabel(string value) =>
+        Same(value, LabelOvertime) || Same(value, "Overtime") || Same(value, "Over Time");
+
+    private static string? NormalizeMetric(string? value)
+    {
+        value = value?.Trim();
+        return string.IsNullOrEmpty(value) || value == "-" ? null : value;
+    }
 
     private static string? NormalizePunch(string? value)
     {

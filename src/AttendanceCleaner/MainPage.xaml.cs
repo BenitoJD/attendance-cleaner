@@ -1,18 +1,22 @@
 using System.Globalization;
 using System.Text;
 using AttendanceCleaner.Core;
+using RoundRectangle = Microsoft.Maui.Controls.Shapes.RoundRectangle;
 
 namespace AttendanceCleaner;
 
 public partial class MainPage : ContentPage
 {
     private readonly IndiaTimeClock _indiaTimeClock = new();
+    private readonly HolidayCalendarStore _holidayCalendarStore;
     private FileResult? _selectedFile;
     private Dashboard? _dashboard;
     private IReadOnlyList<TemplateRow>? _convertedRows;
     private string _sourceFileName = "";
     private string _outputDirectory = "";
     private ReportCategory? _selectedCategory;
+    private MonthlyTemplateKind? _selectedMonthlyTemplate;
+    private List<HolidayEntry> _holidayEntries = new();
     private IDispatcherTimer? _istTimer;
     private DateTimeOffset _nextIstSyncUtc = DateTimeOffset.MinValue;
     private bool _istSyncInProgress;
@@ -26,6 +30,7 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
+        _holidayCalendarStore = new HolidayCalendarStore(GetHolidayCalendarPath());
         if (Application.Current is { } app)
             app.RequestedThemeChanged += OnRequestedThemeChanged;
         UpdateTemplateCardSelection();
@@ -94,10 +99,13 @@ public partial class MainPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             UpdateTemplateCardSelection();
+            UpdateMonthlyTemplateSelection();
             if (_convertedRows is not null)
                 BuildTable(_convertedRows);
             if (_dashboard is not null)
                 BuildDashboard();
+            if (HolidayManagerCard.IsVisible)
+                RenderHolidayRows();
 
             if (DashboardSection.IsVisible)
                 ShowDashboardTab();
@@ -109,27 +117,263 @@ public partial class MainPage : ContentPage
     private async void OnDailyTemplateClicked(object? sender, EventArgs e) =>
         await SelectTemplateAsync(ReportCategory.Daily);
 
-    private async void OnMonthlyTemplateClicked(object? sender, EventArgs e) =>
-        await SelectTemplateAsync(ReportCategory.Monthly);
+    private void OnMonthlyTemplateClicked(object? sender, EventArgs e)
+    {
+        ResetSelectedFile();
+
+        _selectedCategory = ReportCategory.Monthly;
+        _selectedMonthlyTemplate = null;
+        MonthlyOptionsPanel.IsVisible = true;
+        HolidayManagerCard.IsVisible = false;
+        UploadCard.IsVisible = false;
+        UpdateTemplateCardSelection();
+        UpdateMonthlyTemplateSelection();
+    }
 
     private async Task SelectTemplateAsync(ReportCategory category)
     {
-        if (_selectedCategory != category)
+        if (category == ReportCategory.Monthly)
         {
-            _selectedFile = null;
-            FileNameLabel.Text = "";
-            StatusLabel.Text = "";
-            ConvertBtn.IsEnabled = false;
+            OnMonthlyTemplateClicked(null, EventArgs.Empty);
+            return;
         }
 
+        if (_selectedCategory != category)
+            ResetSelectedFile();
+
         _selectedCategory = category;
-        SelectedTemplateLabel.Text = category == ReportCategory.Daily
-            ? "Daily template selected · one-day report"
-            : "Monthly template selected · monthly report";
+        _selectedMonthlyTemplate = null;
+        MonthlyOptionsPanel.IsVisible = false;
+        HolidayManagerCard.IsVisible = false;
+        SelectedTemplateLabel.Text = "Daily template selected · one-day report";
         UploadCard.IsVisible = true;
         UpdateTemplateCardSelection();
         await PickFileAsync();
     }
+
+    private async void OnDutyOvertimeTemplateClicked(object? sender, EventArgs e) =>
+        await SelectMonthlyTemplateAsync(MonthlyTemplateKind.DutyAndOvertime);
+
+    private async void OnInOutTemplateClicked(object? sender, EventArgs e) =>
+        await SelectMonthlyTemplateAsync(MonthlyTemplateKind.InAndOut);
+
+    private async Task SelectMonthlyTemplateAsync(MonthlyTemplateKind kind)
+    {
+        if (_selectedCategory != ReportCategory.Monthly || _selectedMonthlyTemplate != kind)
+            ResetSelectedFile();
+
+        _selectedCategory = ReportCategory.Monthly;
+        _selectedMonthlyTemplate = kind;
+        MonthlyOptionsPanel.IsVisible = true;
+        HolidayManagerCard.IsVisible = false;
+        SelectedTemplateLabel.Text = kind == MonthlyTemplateKind.DutyAndOvertime
+            ? "Monthly template selected · Duty + OT summary"
+            : "Monthly template selected · IN / OUT punch report";
+        UploadCard.IsVisible = true;
+        UpdateTemplateCardSelection();
+        UpdateMonthlyTemplateSelection();
+        await PickFileAsync();
+    }
+
+    private void ResetSelectedFile()
+    {
+        _selectedFile = null;
+        FileNameLabel.Text = "";
+        StatusLabel.Text = "";
+        PickFileBtn.Text = "Choose report file";
+        ConvertBtn.IsEnabled = false;
+    }
+
+    private void UpdateMonthlyTemplateSelection()
+    {
+        var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        var selectedColor = GetThemeColor(dark ? "SuccessDark" : "SuccessLight");
+        var borderColor = GetThemeColor(dark ? "BorderDark" : "BorderLight");
+        var dutySelected = _selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime;
+        var inOutSelected = _selectedMonthlyTemplate == MonthlyTemplateKind.InAndOut;
+        DutyOvertimeCard.Stroke = new SolidColorBrush(dutySelected ? selectedColor : borderColor);
+        DutyOvertimeCard.StrokeThickness = dutySelected ? 2 : 1;
+        SetThemeColor(DutyOvertimeCard, Border.BackgroundColorProperty,
+            dutySelected ? "AccentSurfaceLight" : "SurfaceLight",
+            dutySelected ? "AccentSurfaceDark" : "SurfaceDark");
+        InOutCard.Stroke = new SolidColorBrush(inOutSelected ? selectedColor : borderColor);
+        InOutCard.StrokeThickness = inOutSelected ? 2 : 1;
+        SetThemeColor(InOutCard, Border.BackgroundColorProperty,
+            inOutSelected ? "AccentSurfaceLight" : "SurfaceLight",
+            inOutSelected ? "AccentSurfaceDark" : "SurfaceDark");
+    }
+
+    private void OnManageHolidaysClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            _holidayEntries = _holidayCalendarStore.LoadOrSeed().ToList();
+            RenderHolidayRows();
+            HolidaySaveStatus.Text = $"{_holidayEntries.Count} dates saved on this device.";
+        }
+        catch (Exception ex)
+        {
+            HolidaySaveStatus.Text = $"Could not load the holiday calendar: {ex.Message}";
+            return;
+        }
+
+        MonthlyOptionsPanel.IsVisible = false;
+        UploadCard.IsVisible = false;
+        HolidayManagerCard.IsVisible = true;
+        AddHolidayButton.Focus();
+    }
+
+    private void OnHolidayManagerBackClicked(object? sender, EventArgs e)
+    {
+        HolidayManagerCard.IsVisible = false;
+        MonthlyOptionsPanel.IsVisible = true;
+        UploadCard.IsVisible = _selectedMonthlyTemplate is not null;
+    }
+
+    private void OnAddHolidayClicked(object? sender, EventArgs e)
+    {
+        _holidayEntries.Add(HolidayEntry.Create(DateOnly.FromDateTime(DateTime.Today), "New holiday", "Corporate Office"));
+        SaveHolidayCalendar();
+        RenderHolidayRows();
+    }
+
+    private void RenderHolidayRows()
+    {
+        HolidayRowsLayout.Children.Clear();
+        foreach (var holiday in HolidayCalendarStore.Sort(_holidayEntries))
+        {
+            var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+            var card = new Border
+            {
+                Stroke = new SolidColorBrush(GetThemeColor(dark ? "BorderDark" : "BorderLight")),
+                StrokeThickness = 1,
+                BackgroundColor = GetThemeColor("SurfaceAltLight"),
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+                Padding = new Thickness(10),
+            };
+            SetThemeColor(card, Border.BackgroundColorProperty, "SurfaceAltLight", "SurfaceAltDark");
+
+            var layout = new Grid { RowSpacing = 8, ColumnSpacing = 8 };
+            layout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            layout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+            var datePicker = new DatePicker
+            {
+                Date = holiday.Date.ToDateTime(TimeOnly.MinValue),
+                Format = "dd MMM yyyy",
+                HorizontalOptions = LayoutOptions.Fill,
+                BackgroundColor = GetThemeColor("SurfaceLight"),
+            };
+            SetThemeColor(datePicker, DatePicker.TextColorProperty, "TextBodyLight", "TextBodyDark");
+            SetThemeColor(datePicker, DatePicker.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+
+            var categoryPicker = new Picker
+            {
+                Title = "Category",
+                ItemsSource = HolidayCategories,
+                SelectedItem = holiday.Category,
+                HorizontalOptions = LayoutOptions.Fill,
+                BackgroundColor = GetThemeColor("SurfaceLight"),
+            };
+            SetThemeColor(categoryPicker, Picker.TextColorProperty, "TextBodyLight", "TextBodyDark");
+            SetThemeColor(categoryPicker, Picker.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+
+            var nameEntry = new Entry
+            {
+                Text = holiday.Name,
+                Placeholder = "Holiday name",
+                HorizontalOptions = LayoutOptions.Fill,
+                BackgroundColor = GetThemeColor("SurfaceLight"),
+            };
+            SetThemeColor(nameEntry, Entry.TextColorProperty, "TextBodyLight", "TextBodyDark");
+            SetThemeColor(nameEntry, Entry.PlaceholderColorProperty, "TextSecondaryLight", "TextSecondaryDark");
+            SetThemeColor(nameEntry, Entry.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+
+            var removeButton = new Button
+            {
+                Text = "Remove",
+                FontSize = 12,
+                Padding = new Thickness(10, 7),
+                CornerRadius = 9,
+                BackgroundColor = GetThemeColor("SurfaceLight"),
+                TextColor = GetThemeColor("DangerLight"),
+                BorderColor = GetThemeColor("DangerLight"),
+                BorderWidth = 1,
+            };
+            SetThemeColor(removeButton, Button.BackgroundColorProperty, "SurfaceLight", "SurfaceDark");
+            SetThemeColor(removeButton, Button.TextColorProperty, "DangerLight", "DangerDark");
+            SetThemeColor(removeButton, Button.BorderColorProperty, "DangerLight", "DangerDark");
+
+            var topRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) }, ColumnSpacing = 8 };
+            topRow.Add(datePicker, 0);
+            topRow.Add(categoryPicker, 1);
+            var bottomRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 8 };
+            bottomRow.Add(nameEntry, 0);
+            bottomRow.Add(removeButton, 1);
+            layout.Add(topRow, 0, 0);
+            layout.Add(bottomRow, 0, 1);
+            card.Content = layout;
+
+            datePicker.DateSelected += (_, args) =>
+            {
+                if (args.NewDate.HasValue)
+                    UpdateHoliday(holiday.Id, entry => entry with { Date = DateOnly.FromDateTime(args.NewDate.Value) });
+            };
+            categoryPicker.SelectedIndexChanged += (_, _) =>
+            {
+                if (categoryPicker.SelectedItem is string category)
+                    UpdateHoliday(holiday.Id, entry => entry with { Category = category });
+            };
+            nameEntry.TextChanged += (_, args) => UpdateHoliday(holiday.Id, entry => entry with { Name = args.NewTextValue ?? "" });
+            removeButton.Clicked += (_, _) =>
+            {
+                _holidayEntries.RemoveAll(entry => entry.Id == holiday.Id);
+                SaveHolidayCalendar();
+                RenderHolidayRows();
+            };
+            HolidayRowsLayout.Children.Add(card);
+        }
+    }
+
+    private void UpdateHoliday(string id, Func<HolidayEntry, HolidayEntry> update)
+    {
+        var index = _holidayEntries.FindIndex(entry => entry.Id == id);
+        if (index < 0) return;
+        _holidayEntries[index] = update(_holidayEntries[index]);
+        SaveHolidayCalendar();
+    }
+
+    private void SaveHolidayCalendar()
+    {
+        try
+        {
+            _holidayCalendarStore.Save(_holidayEntries);
+            HolidaySaveStatus.Text = $"Saved · {_holidayEntries.Count} holiday details";
+        }
+        catch (Exception ex)
+        {
+            HolidaySaveStatus.Text = $"Could not save the holiday calendar: {ex.Message}";
+        }
+    }
+
+    private static string GetHolidayCalendarPath()
+    {
+#if WINDOWS
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Attendance Cleaner", "holiday-calendar.json");
+#else
+        return Path.Combine(FileSystem.AppDataDirectory, "holiday-calendar.json");
+#endif
+    }
+
+    private static readonly string[] HolidayCategories =
+    {
+        "Corporate Office",
+        "Tamil Nadu",
+        "Optional · Corporate Office",
+        "Optional · Tamil Nadu",
+        "Working Saturday · Corporate Office",
+    };
 
     private void UpdateTemplateCardSelection()
     {
@@ -197,11 +441,20 @@ public partial class MainPage : ContentPage
     {
         if (_selectedFile is null || _selectedCategory is null) return;
         var selectedCategory = _selectedCategory.Value;
+        var selectedMonthlyTemplate = _selectedMonthlyTemplate;
+        if (selectedCategory == ReportCategory.Monthly && selectedMonthlyTemplate is null)
+        {
+            StatusLabel.Text = "Choose one of the monthly templates first.";
+            return;
+        }
 
         ConvertBtn.IsEnabled = false;
         PickFileBtn.IsEnabled = false;
         DailyTemplateButton.IsEnabled = false;
         MonthlyTemplateButton.IsEnabled = false;
+        MonthlyDutyButton.IsEnabled = false;
+        MonthlyInOutButton.IsEnabled = false;
+        ManageHolidaysButton.IsEnabled = false;
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
         StatusLabel.Text = "Reading the report...";
@@ -248,7 +501,9 @@ public partial class MainPage : ContentPage
                 var fileName = string.Format(
                     CultureInfo.InvariantCulture,
                     selectedCategory == ReportCategory.Monthly
-                        ? TemplateSpec.MonthlyFileName
+                        ? selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime
+                            ? TemplateSpec.MonthlyDutyOvertimeFileName
+                            : TemplateSpec.MonthlyInOutFileName
                         : TemplateSpec.DailyFileName,
                     dates[0]);
 
@@ -263,21 +518,42 @@ public partial class MainPage : ContentPage
 
             // 3. generate the workbook and write it
             StatusLabel.Text = "Converting...";
-            var rows = await Task.Run(() =>
+            var conversion = await Task.Run(() =>
             {
                 var built = TemplateWriter.BuildRows(parsed.report.Records);
                 using var ms = new MemoryStream();
-                TemplateWriter.Write(parsed.report.Records, ms);
+                IReadOnlyList<MonthlyEmployeeSummary>? summaries = null;
+                if (selectedCategory == ReportCategory.Monthly)
+                {
+                    var holidays = _holidayCalendarStore.LoadOrSeed();
+                    var monthlyKind = selectedMonthlyTemplate!.Value;
+                    MonthlyTemplateWriter.Write(parsed.report.Records, holidays, monthlyKind, ms);
+                    summaries = MonthlyTemplateWriter.BuildSummaries(
+                        parsed.report.Records, holidays, parsed.dates[0]);
+                }
+                else
+                {
+                    TemplateWriter.Write(parsed.report.Records, ms);
+                }
                 File.WriteAllBytes(outputPath, ms.ToArray());
-                return built;
+                return (Rows: built, Summaries: summaries);
             });
 
-            var present = rows.Count(r => r.Remark == TemplateSpec.RemarkPresent);
-            var absent = rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent);
-            StatTotal.Text = $"{rows.Count}";
+            var rows = conversion.Rows;
+            var present = conversion.Summaries is null
+                ? rows.Count(r => r.Remark == TemplateSpec.RemarkPresent)
+                : conversion.Summaries.Sum(summary => summary.PresentDays);
+            var absent = conversion.Summaries is null
+                ? rows.Count(r => r.Remark == TemplateSpec.RemarkAbsent)
+                : conversion.Summaries.Sum(summary => summary.AbsentDays);
+            StatTotalLabel.Text = selectedCategory == ReportCategory.Monthly ? "employees" : "rows";
+            StatTotal.Text = $"{conversion.Summaries?.Count ?? rows.Count}";
             StatPresent.Text = $"{present}";
             StatAbsent.Text = $"{absent}";
-            SavedLabel.Text = $"Saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
+            var templateName = selectedCategory == ReportCategory.Monthly
+                ? selectedMonthlyTemplate == MonthlyTemplateKind.DutyAndOvertime ? "Duty + OT" : "IN / OUT"
+                : "Daily";
+            SavedLabel.Text = $"{templateName} · saved as {Path.GetFileName(outputPath)}  ·  {outputPath}";
             _convertedRows = rows;
             BuildTable(rows);
 
@@ -302,6 +578,9 @@ public partial class MainPage : ContentPage
             PickFileBtn.IsEnabled = true;
             DailyTemplateButton.IsEnabled = true;
             MonthlyTemplateButton.IsEnabled = true;
+            MonthlyDutyButton.IsEnabled = true;
+            MonthlyInOutButton.IsEnabled = true;
+            ManageHolidaysButton.IsEnabled = true;
         }
     }
 
@@ -339,9 +618,14 @@ public partial class MainPage : ContentPage
         StatusLabel.Text = "";
         ConvertBtn.IsEnabled = false;
         UploadCard.IsVisible = false;
+        MonthlyOptionsPanel.IsVisible = false;
+        HolidayManagerCard.IsVisible = false;
         SelectedTemplateLabel.Text = "";
         _selectedCategory = null;
+        _selectedMonthlyTemplate = null;
+        ResetSelectedFile();
         UpdateTemplateCardSelection();
+        UpdateMonthlyTemplateSelection();
         _convertedRows = null;
         _dashboard = null;
         ShowTableTab();
