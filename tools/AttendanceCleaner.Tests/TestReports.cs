@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace AttendanceCleaner.Tests;
@@ -118,6 +119,30 @@ public static class TestReports
                 _ => "-",
             }));
         }
+    }
+
+    public static string MonthlyRowsWithTotals()
+    {
+        var days = Cells(Enumerable.Range(1, 30).Select(day => day.ToString(CultureInfo.InvariantCulture)));
+        var weekdays = Cells(Enumerable.Repeat("Tue.", 30));
+        var punches = Cells(Enumerable.Repeat("-", 30));
+        return $"""
+            <html><body>
+            <table>
+            <tr><td colspan="40">From: 01-09-2026 To: 30-09-2026</td></tr>
+            <tr><td rowspan="2">No.</td><td rowspan="2">Person ID</td><td rowspan="2">Name</td><td rowspan="2"></td>{days}
+            <td rowspan="2">*</td><td rowspan="2">Absent(Day(s))</td><td rowspan="2">Attended(Actual)</td><td colspan="2">Leave</td></tr>
+            <tr>{weekdays}<td>Sick Leave</td><td>Annual Leave</td></tr>
+            </table>
+            <table>
+            <tr><td>1</td><td>3</td><td>AJITH.S.S</td><td>Check-in1</td>{punches}<td>-</td><td>30.0</td><td>0</td><td>1.5</td><td>2</td></tr>
+            <tr><td>1</td><td>3</td><td>AJITH.S.S</td><td>Check-out1</td>{punches}<td>-</td></tr>
+            <tr><td>1</td><td>3</td><td>AJITH.S.S</td><td>Attended</td>{punches}</tr>
+            </table>
+            </body></html>
+            """;
+
+        static string Cells(IEnumerable<string> values) => string.Concat(values.Select(value => $"<td>{value}</td>"));
     }
 
     // --- an export the app should refuse (no recognisable layout) ---

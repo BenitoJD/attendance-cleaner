@@ -89,7 +89,9 @@ public static partial class AttendanceParser
         }
         if (FindMonthlyRowsHeader(tables) is { } monthly)
         {
-            return new ParsedReport(AttendanceExportFormat.MonthlyRows, ParseMonthlyRows(tables, monthly.header, monthly.dayColumns, html));
+            var (records, totals) = ParseMonthlyRows(
+                tables, monthly.header, monthly.summaryHeader, monthly.dayColumns, html);
+            return new ParsedReport(AttendanceExportFormat.MonthlyRows, records, totals);
         }
         if (LooksLikeMonthlyOverview(tables))
         {
@@ -120,6 +122,7 @@ public static partial class AttendanceParser
         int ixDate = FindIndex(header, LabelDate);
         int ixIn = header.FindIndex(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase));
         int ixOut = header.FindIndex(c => c.StartsWith("Check-out", StringComparison.OrdinalIgnoreCase));
+        int ixAttended = FindIndex(header, LabelAttended);
 
         var records = new List<AttendanceRecord>();
         int order = 0;
@@ -142,7 +145,8 @@ public static partial class AttendanceParser
                 Date: date,
                 InPunch: NormalizePunch(Cell(row, ixIn)),
                 OutPunch: NormalizePunch(Cell(row, ixOut)),
-                Order: order++));
+                Order: order++,
+                Attended: NormalizeMetric(Cell(row, ixAttended))));
         }
         return records;
     }
@@ -251,11 +255,12 @@ public static partial class AttendanceParser
 
     // --- Monthly performance report: metric rows per employee, days as columns ---
 
-    private static (List<string> header, List<int> dayColumns)? FindMonthlyRowsHeader(List<List<List<string>>> tables)
+    private static (List<string> header, List<string> summaryHeader, List<int> dayColumns)? FindMonthlyRowsHeader(List<List<List<string>>> tables)
     {
         foreach (var table in tables)
-        foreach (var row in table)
+        for (var rowIndex = 0; rowIndex < table.Count; rowIndex++)
         {
+            var row = table[rowIndex];
             if (!Same(Cell(row, 0), LabelNo) || !row.Any(c => Same(c, LabelPersonId))) continue;
             var dayColumns = new List<int>();
             for (int c = 0; c < row.Count; c++)
@@ -265,7 +270,11 @@ public static partial class AttendanceParser
                     dayColumns.Add(c);
                 }
             }
-            if (dayColumns.Count >= 28) return (row, dayColumns);
+            if (dayColumns.Count >= 28)
+            {
+                var summaryHeader = rowIndex + 1 < table.Count ? table[rowIndex + 1] : new List<string>();
+                return (row, summaryHeader, dayColumns);
+            }
         }
         return null;
     }
@@ -276,14 +285,26 @@ public static partial class AttendanceParser
             && Same(Cell(row, 1), LabelName)
             && row.Count(c => int.TryParse(c, out var day) && day is >= 1 and <= 31) >= 28);
 
-    private static List<AttendanceRecord> ParseMonthlyRows(
-        List<List<List<string>>> tables, List<string> header, List<int> dayColumns, string html)
+    private static (List<AttendanceRecord> Records, List<MonthlyEmployeeTotals> Totals) ParseMonthlyRows(
+        List<List<List<string>>> tables,
+        List<string> header,
+        List<string> summaryHeader,
+        List<int> dayColumns,
+        string html)
     {
         var from = StartDateOf(html);
         int ixNo = FindIndex(header, LabelNo);
         int ixId = FindIndex(header, LabelPersonId);
         int ixName = FindIndex(header, LabelName);
         int labelColumn = ixName + 1;
+        int ixAbsent = FindHeader(header, value => NormalizeHeader(value).StartsWith("absent", StringComparison.Ordinal));
+        int ixAttended = FindHeader(header, value => NormalizeHeader(value).StartsWith("attendedactual", StringComparison.Ordinal));
+        int ixLeave = FindHeader(header, value => Same(value, "Leave"));
+        var leaveColumns = ixLeave < 0
+            ? Array.Empty<int>()
+            : Enumerable.Range(ixLeave, Math.Max(0, summaryHeader.Count - ixLeave))
+                .Where(column => !string.IsNullOrWhiteSpace(Cell(summaryHeader, column)))
+                .ToArray();
 
         var rows = tables.SelectMany(t => t)
             .Where(r => r.Count > labelColumn && r.Count > dayColumns.Max())
@@ -292,6 +313,7 @@ public static partial class AttendanceParser
         // metric rows repeat (No, ID, Name) on every row of the employee's block
         var blocks = new Dictionary<string, Dictionary<string, Dictionary<int, string>>>();
         var order = new Dictionary<string, int>();
+        var employeeTotals = new Dictionary<string, MonthlyEmployeeTotals>();
         foreach (var row in rows)
         {
             var label = Cell(row, labelColumn);
@@ -309,6 +331,15 @@ public static partial class AttendanceParser
                 metrics = new Dictionary<string, Dictionary<int, string>>();
                 blocks[key] = metrics;
                 order[key] = no;
+            }
+            if (isCheckIn)
+            {
+                decimal? absentDays = ReadDecimal(row, ixAbsent);
+                decimal? attendedDays = ReadDecimal(row, ixAttended);
+                decimal? leaveDays = SumDecimalCells(row, leaveColumns);
+                if (absentDays is not null || attendedDays is not null || leaveDays is not null)
+                    employeeTotals[key] = new MonthlyEmployeeTotals(Cell(row, ixId), Cell(row, ixName), no,
+                        absentDays, attendedDays, leaveDays);
             }
             var values = new Dictionary<int, string>();
             foreach (var col in dayColumns) values[col] = Cell(row, col);
@@ -345,7 +376,37 @@ public static partial class AttendanceParser
                     Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
             }
         }
-        return records;
+        return (records, employeeTotals.Values.OrderBy(total => total.Order).ToList());
+    }
+
+    private static int FindHeader(List<string> header, Func<string, bool> match) =>
+        header.FindIndex(cell => match(cell.Trim()));
+
+    private static string NormalizeHeader(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static decimal? ReadDecimal(List<string> row, int index)
+    {
+        var value = Cell(row, index).Trim();
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number)
+            ? number
+            : null;
+    }
+
+    private static decimal? SumDecimalCells(List<string> row, IReadOnlyList<int> columns)
+    {
+        if (columns.Count == 0) return null;
+        decimal total = 0;
+        var foundValue = false;
+        foreach (var column in columns)
+        {
+            var value = Cell(row, column).Trim();
+            if (value.Length == 0 || value == "-") continue;
+            if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number)) continue;
+            total += number;
+            foundValue = true;
+        }
+        return foundValue ? total : null;
     }
 
     // --- helpers ---

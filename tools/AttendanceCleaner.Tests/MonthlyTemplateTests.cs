@@ -234,6 +234,19 @@ public sealed class MonthlyTemplateTests
         }
     }
 
+    [Fact]
+    public void Monthly_rows_aggregate_totals_are_used_and_holiday_credit_reclassifies_absence()
+    {
+        var report = AttendanceParser.Parse(TestReports.MonthlyRowsWithTotals());
+        var holiday = HolidayEntry.Create(new DateOnly(2026, 9, 14), "Founder's Day", "Corporate Office");
+        var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(
+            report.Records, new[] { holiday }, new DateOnly(2026, 9, 1), report.EmployeeTotals));
+
+        Assert.Equal(1m, summary.PresentDays);
+        Assert.Equal(21m, summary.AbsentDays);
+        Assert.Equal(11.5m, summary.LeaveDays);
+    }
+
     private static AttendanceRecord[] SampleRecords() =>
     [
         new AttendanceRecord("007", "Example Employee", "-", Month, "06:51", "19:00", 0,

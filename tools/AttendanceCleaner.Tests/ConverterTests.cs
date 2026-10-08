@@ -42,6 +42,7 @@ public class DailyReportParserTests
         var row = ParseDaily().Records[0];
         Assert.Equal("06:51", row.InPunch);
         Assert.Equal("19:00", row.OutPunch);
+        Assert.Equal("12", row.Attended);
     }
 
     [Fact]
@@ -169,6 +170,20 @@ public class MonthlyRowsParserTests
         var Micheal = ParseRows().Records.Where(r => r.Name == "MICHEAL ANTONY").ToList();
         Assert.All(Micheal, r => Assert.True(r.InPunch == null || r.Date.Day == 2));
     }
+
+    [Fact]
+    public void Reads_aggregate_absence_attendance_and_leave_totals()
+    {
+        var report = AttendanceParser.Parse(TestReports.MonthlyRowsWithTotals());
+        var totals = Assert.Single(report.EmployeeTotals!);
+
+        Assert.Equal("3", totals.Id);
+        Assert.Equal("AJITH.S.S", totals.Name);
+        Assert.Equal(30m, totals.AbsentDays);
+        Assert.Equal(0m, totals.AttendedDays);
+        Assert.Equal(3.5m, totals.LeaveDays);
+        Assert.All(report.Records, record => Assert.Null(record.Status));
+    }
 }
 
 public class ParserErrorTests
@@ -286,6 +301,14 @@ public class TemplateWriterRowTests
     {
         var rows = TemplateWriter.BuildRows(new[] { Record("3", "A", Day1, "06:51", "19:00") });
         Assert.Equal("12:09", rows[0].TotalHours);
+    }
+
+    [Fact]
+    public void Reported_attendance_hours_are_used_before_punch_span()
+    {
+        var record = new AttendanceRecord("3", "A", "Male", Day1, "06:51", "19:00", 0, Attended: "12");
+        var rows = TemplateWriter.BuildRows(new[] { record });
+        Assert.Equal("12:00", rows[0].TotalHours);
     }
 
     [Fact]

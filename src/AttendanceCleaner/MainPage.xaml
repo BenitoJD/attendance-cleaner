@@ -306,6 +306,9 @@
                         </Label.GestureRecognizers>
                     </Label>
                     <Label x:Name="SavedPathLabel" FontSize="10" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" MaxLines="1" LineBreakMode="TailTruncation" />
+                    <Label x:Name="ConversionWarningLabel" FontSize="10"
+                           TextColor="{AppThemeBinding Light=#92400E, Dark=#FCD34D}"
+                           MaxLines="2" LineBreakMode="WordWrap" IsVisible="False" />
                 </VerticalStackLayout>
                 <Button Grid.Column="1"
                         Text="Convert another file"

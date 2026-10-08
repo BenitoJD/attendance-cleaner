@@ -14,9 +14,9 @@ public sealed record MonthlyEmployeeSummary(
     string Name,
     int Order,
     int ScheduledWorkdays,
-    int PresentDays,
-    int AbsentDays,
-    int LeaveDays,
+    decimal PresentDays,
+    decimal AbsentDays,
+    decimal LeaveDays,
     decimal TotalDutyHours,
     decimal TotalOvertimeHours,
     decimal TotalHours);
@@ -55,7 +55,8 @@ public static class MonthlyTemplateWriter
     public static IReadOnlyList<MonthlyEmployeeSummary> BuildSummaries(
         IEnumerable<AttendanceRecord> source,
         IReadOnlyCollection<HolidayEntry> holidays,
-        DateOnly month)
+        DateOnly month,
+        IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
         var records = source.ToList();
         var mandatoryHolidayDates = holidays
@@ -76,11 +77,13 @@ public static class MonthlyTemplateWriter
         var summaries = new List<MonthlyEmployeeSummary>();
         foreach (var group in EmployeeGroups(records))
         {
+            var reportedTotals = employeeTotals?.FirstOrDefault(total =>
+                total.Id == group.Id && string.Equals(total.Name, group.Name, StringComparison.Ordinal));
             var byDate = group.Records.GroupBy(record => record.Date)
                 .ToDictionary(day => day.Key, day => day.OrderBy(record => record.Order).First());
-            var present = 0;
-            var absent = 0;
-            var leave = 0;
+            decimal present = 0;
+            decimal absent = 0;
+            decimal leave = 0;
             decimal dutyTotal = 0;
             decimal overtimeTotal = 0;
             decimal total = 0;
@@ -121,6 +124,28 @@ public static class MonthlyTemplateWriter
                 }
             }
 
+            if (reportedTotals is not null
+                && !group.Records.Any(record => !string.IsNullOrWhiteSpace(record.Status)))
+            {
+                // The full-version monthly export has aggregate absence/leave totals, but no
+                // daily status row. Move its unworked weekly-off and credited-holiday days
+                // out of the reported absence total; exact leave dates remain unavailable.
+                var unworkedDaysOff = Enumerable.Range(1, daysInMonth)
+                    .Select(day => new DateOnly(month.Year, month.Month, day))
+                    .Count(date => !mandatoryHolidayDates.Contains(date)
+                        && IsRegularDayOff(date, workingSaturdayDates)
+                        && (!byDate.TryGetValue(date, out var record) || !IsPresent(record)));
+                var creditedHolidays = mandatoryHolidayDates
+                    .Count(date => !byDate.TryGetValue(date, out var record) || !IsPresent(record));
+
+                if (reportedTotals.AttendedDays is { } attendedDays)
+                    present = attendedDays + creditedHolidays;
+                if (reportedTotals.AbsentDays is { } absentDays)
+                    absent = Math.Max(0m, absentDays - unworkedDaysOff - creditedHolidays);
+                if (reportedTotals.LeaveDays is { } leaveDays)
+                    leave = leaveDays + unworkedDaysOff;
+            }
+
             summaries.Add(new MonthlyEmployeeSummary(
                 group.Id,
                 group.Name,
@@ -140,7 +165,8 @@ public static class MonthlyTemplateWriter
         IEnumerable<AttendanceRecord> source,
         IReadOnlyCollection<HolidayEntry> holidays,
         MonthlyTemplateKind kind,
-        Stream output)
+        Stream output,
+        IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
         var records = source.ToList();
         if (records.Count == 0)
@@ -151,7 +177,7 @@ public static class MonthlyTemplateWriter
             throw new InvalidDataException("Monthly templates support one calendar month per report.");
 
         var daysInMonth = DateTime.DaysInMonth(month.Year, month.Month);
-        var summaries = BuildSummaries(records, holidays, month);
+        var summaries = BuildSummaries(records, holidays, month, employeeTotals);
         var summaryByEmployee = summaries.ToDictionary(summary => EmployeeKey(summary.Id, summary.Name));
         var employees = EmployeeGroups(records).ToList();
         var titleColumn = 4 + daysInMonth * 2 + 6;

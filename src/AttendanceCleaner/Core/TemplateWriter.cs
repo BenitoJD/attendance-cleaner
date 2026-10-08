@@ -55,7 +55,7 @@ public static class TemplateWriter
                     Day: record.Date.ToString("ddd", CultureInfo.InvariantCulture),
                     InPunch: record.InPunch,
                     OutPunch: record.OutPunch,
-                    TotalHours: TotalHours(record.InPunch, record.OutPunch),
+                    TotalHours: TotalHours(record),
                     Remark: Remark(record)));
             }
         }
@@ -121,18 +121,40 @@ public static class TemplateWriter
         : record.InPunch != null || record.OutPunch != null ? TemplateSpec.RemarkInPunchOnly
         : TemplateSpec.RemarkAbsent;
 
-    private static string? TotalHours(string? inPunch, string? outPunch)
+    private static string? TotalHours(AttendanceRecord record)
     {
-        if (inPunch == null || outPunch == null) return null;
-        if (!TimeOnly.TryParseExact(inPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tin)
-            || !TimeOnly.TryParseExact(outPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tout))
+        if (TryParseReportedHours(record.Attended, out var reportedMinutes))
+            return FormatMinutes(reportedMinutes);
+
+        if (record.InPunch == null || record.OutPunch == null) return null;
+        if (!TimeOnly.TryParseExact(record.InPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tin)
+            || !TimeOnly.TryParseExact(record.OutPunch, TemplateSpec.TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var tout))
         {
             return null;
         }
         var minutes = (int)(tout - tin).TotalMinutes;
         if (minutes < 0) minutes += 24 * 60; // punches crossing midnight
-        return $"{minutes / 60:00}:{minutes % 60:00}";
+        return FormatMinutes(minutes);
     }
+
+    private static bool TryParseReportedHours(string? value, out int minutes)
+    {
+        minutes = 0;
+        value = value?.Trim();
+        if (string.IsNullOrEmpty(value) || value == "-") return false;
+
+        decimal hours;
+        if (value.Contains(':') && TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var span))
+            hours = (decimal)span.TotalHours;
+        else if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out hours))
+            return false;
+
+        if (hours <= 0) return false;
+        minutes = (int)decimal.Round(hours * 60m, 0, MidpointRounding.AwayFromZero);
+        return minutes > 0;
+    }
+
+    private static string FormatMinutes(int minutes) => $"{minutes / 60:00}:{minutes % 60:00}";
 
     private static bool KeepsLeadingZeros(string id) =>
         id.Length > 1 && id[0] == '0' && id.All(char.IsDigit);

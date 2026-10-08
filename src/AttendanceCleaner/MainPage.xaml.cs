@@ -507,6 +507,8 @@ public partial class MainPage : ContentPage
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
         StatusLabel.Text = "Reading the report...";
+        ConversionWarningLabel.Text = "";
+        ConversionWarningLabel.IsVisible = false;
 
         try
         {
@@ -556,7 +558,17 @@ public partial class MainPage : ContentPage
                         : TemplateSpec.DailyFileName,
                     dates[0]);
 
-                return (report, dates, fileName);
+                var monthlyWarning = selectedCategory == ReportCategory.Monthly
+                    && report.Format == AttendanceExportFormat.MonthlyRows
+                    && report.Records.All(record => string.IsNullOrWhiteSpace(record.Status))
+                    ? report.EmployeeTotals?.Any(total => total.AbsentDays is not null
+                        || total.AttendedDays is not null
+                        || total.LeaveDays is not null) == true
+                        ? "Monthly totals use the report's employee counts. No daily leave/absence codes are available, so dates cannot be identified and totals may not match the calendar."
+                        : "This report has no daily leave/absence codes or summary counts. Monthly absence and leave are inferred from punches and the calendar."
+                    : "";
+
+                return (report, dates, fileName, monthlyWarning);
             });
 
             // 2. let the user choose where to save it
@@ -577,12 +589,13 @@ public partial class MainPage : ContentPage
                 {
                     var holidays = _holidayCalendarStore.LoadOrSeed();
                     var monthlyKind = selectedMonthlyTemplate!.Value;
-                    MonthlyTemplateWriter.Write(parsed.report.Records, holidays, monthlyKind, ms);
+                    MonthlyTemplateWriter.Write(parsed.report.Records, holidays, monthlyKind, ms,
+                        parsed.report.EmployeeTotals);
                     var workbookBytes = ms.ToArray();
                     using var previewStream = new MemoryStream(workbookBytes, writable: false);
                     monthlyPreview = MonthlyTemplateWriter.ReadPreview(previewStream);
                     summaries = MonthlyTemplateWriter.BuildSummaries(
-                        parsed.report.Records, holidays, parsed.dates[0]);
+                        parsed.report.Records, holidays, parsed.dates[0], parsed.report.EmployeeTotals);
                     File.WriteAllBytes(outputPath, workbookBytes);
                 }
                 else
@@ -604,6 +617,8 @@ public partial class MainPage : ContentPage
                 ? "Tap to share or save a copy"
                 : "Tap to open the saved workbook";
             SavedPathLabel.Text = $"Saved at: {outputPath}";
+            ConversionWarningLabel.Text = parsed.monthlyWarning;
+            ConversionWarningLabel.IsVisible = !string.IsNullOrWhiteSpace(parsed.monthlyWarning);
             _lastOutputPath = outputPath;
             _monthlyWorkbookPreview = conversion.MonthlyPreview;
             _monthlySheetDrawable = null;
@@ -715,6 +730,8 @@ public partial class MainPage : ContentPage
         SavedLabel.Text = "";
         SavedLocationLabel.Text = "";
         SavedPathLabel.Text = "";
+        ConversionWarningLabel.Text = "";
+        ConversionWarningLabel.IsVisible = false;
         _dashboard = null;
         ShowTableTab();
     }
