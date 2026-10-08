@@ -20,6 +20,7 @@ public partial class MainPage : ContentPage
     private IDispatcherTimer? _istTimer;
     private DateTimeOffset _nextIstSyncUtc = DateTimeOffset.MinValue;
     private bool _istSyncInProgress;
+    private bool _use24HourIstTime;
 
     private enum ReportCategory
     {
@@ -71,8 +72,17 @@ public partial class MainPage : ContentPage
     private void UpdateIstClock()
     {
         var now = _indiaTimeClock.CurrentTime;
-        IstTimeLabel.Text = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        IstTimeLabel.Text = now.ToString(_use24HourIstTime ? "HH:mm:ss" : "hh:mm:ss tt", CultureInfo.InvariantCulture);
         IstDateLabel.Text = now.ToString("dddd, dd MMMM yyyy", CultureInfo.InvariantCulture);
+    }
+
+    private void OnIstTimeTapped(object? sender, TappedEventArgs e)
+    {
+        _use24HourIstTime = !_use24HourIstTime;
+        IstTimeFormatHintLabel.Text = _use24HourIstTime
+            ? "Tap or click clock for AM/PM time"
+            : "Tap or click clock for 24-hour time";
+        UpdateIstClock();
     }
 
     private async Task SynchronizeIstClockAsync()

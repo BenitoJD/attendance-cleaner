@@ -16,9 +16,16 @@
                 <VerticalStackLayout Spacing="2" VerticalOptions="Center">
                     <Label Text="INDIA STANDARD TIME" FontSize="10" FontAttributes="Bold" CharacterSpacing="1"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                    <Label x:Name="IstTimeLabel" Text="--:--:--" FontSize="30" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Label x:Name="IstTimeLabel" Text="--:--:-- AM" FontSize="30" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                           SemanticProperties.Hint="Tap or click to switch the clock format">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnIstTimeTapped" />
+                        </Label.GestureRecognizers>
+                    </Label>
                     <Label x:Name="IstDateLabel" Text="" FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    <Label x:Name="IstTimeFormatHintLabel" Text="Tap or click clock for 24-hour time" FontSize="10"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                 </VerticalStackLayout>
                 <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center" HorizontalOptions="End">
