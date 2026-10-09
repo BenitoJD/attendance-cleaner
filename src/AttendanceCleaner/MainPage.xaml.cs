@@ -37,6 +37,8 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
+        OutputFormatPicker.SelectedIndex = 0;
+        MonthlyPdfLayoutPicker.SelectedIndex = 0;
         using (var logoStream = typeof(MonthlyTemplateWriter).Assembly
             .GetManifestResourceStream("AttendanceCleaner.Core.DakshinakTemplateLogo.png"))
         {
@@ -391,8 +393,18 @@ public partial class MainPage : ContentPage
         ("Working Saturday", MonthlyTemplateSpec.WorkingSaturdayCategory),
     };
 
+    private void OnOutputFormatChanged(object? sender, EventArgs e) => UpdatePdfLayoutVisibility();
+
+    private void UpdatePdfLayoutVisibility()
+    {
+        if (MonthlyPdfLayoutPanel is not null)
+            MonthlyPdfLayoutPanel.IsVisible = _selectedCategory == ReportCategory.Monthly
+                && OutputFormatPicker.SelectedIndex == 1;
+    }
+
     private void UpdateTemplateCardSelection()
     {
+        UpdatePdfLayoutVisibility();
         var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
         var selectedColor = GetThemeColor(dark ? "SuccessDark" : "SuccessLight");
         var borderColor = GetThemeColor(dark ? "BorderDark" : "BorderLight");
@@ -457,6 +469,10 @@ public partial class MainPage : ContentPage
     private async void OnConvertClicked(object? sender, EventArgs e)
     {
         if (_selectedFile is null || _selectedCategory is null) return;
+        var saveAsPdf = OutputFormatPicker.SelectedIndex == 1;
+        var extension = saveAsPdf ? ".pdf" : ".xlsx";
+        var pdfLayout = MonthlyPdfLayoutPicker.SelectedIndex == 1
+            ? MonthlyPdfLayout.Weekly : MonthlyPdfLayout.FullMonth;
         var selectedFile = _selectedFile;
         var selectedCategory = _selectedCategory.Value;
         var selectedMonthlyTemplate = _selectedMonthlyTemplate;
@@ -467,6 +483,8 @@ public partial class MainPage : ContentPage
         }
 
         ConvertBtn.IsEnabled = false;
+        OutputFormatPicker.IsEnabled = false;
+        MonthlyPdfLayoutPicker.IsEnabled = false;
         PickFileBtn.IsEnabled = false;
         DailyTemplateButton.IsEnabled = false;
         MonthlyTemplateButton.IsEnabled = false;
@@ -549,8 +567,8 @@ public partial class MainPage : ContentPage
             });
 
             // 2. let the user choose where to save it
-            StatusLabel.Text = "Choose where to save the clean Excel...";
-            var outputPath = await AskForSaveLocationAsync(parsed.fileName, ".xlsx");
+            StatusLabel.Text = $"Choose where to save the {(saveAsPdf ? "PDF report" : "Excel workbook")}...";
+            var outputPath = await AskForSaveLocationAsync(Path.ChangeExtension(parsed.fileName, extension), extension);
             if (outputPath is null)
             {
                 StatusLabel.Text = "Save cancelled. No file was created.";
@@ -575,13 +593,16 @@ public partial class MainPage : ContentPage
                     var workbookBytes = ms.ToArray();
                     using var previewStream = new MemoryStream(workbookBytes, writable: false);
                     monthlyPreview = MonthlyTemplateWriter.ReadPreview(previewStream);
-                    ReportFileWriter.WriteBytes(outputPath, workbookBytes);
                 }
                 else
                 {
                     TemplateWriter.Write(parsed.report.Records, ms);
-                    ReportFileWriter.WriteBytes(outputPath, ms.ToArray());
                 }
+                ms.Position = 0;
+                var content = saveAsPdf
+                    ? TemplatePdf.Build(ms, selectedCategory == ReportCategory.Monthly, pdfLayout)
+                    : ms.ToArray();
+                ReportFileWriter.WriteBytes(outputPath, content);
                 return (Rows: built, Summaries: summaries, MonthlyPreview: monthlyPreview);
             });
 
@@ -594,7 +615,7 @@ public partial class MainPage : ContentPage
             SavedLabel.Text = $"{templateName} · {Path.GetFileName(outputPath)}";
             SavedLocationLabel.Text = DeviceInfo.Platform == DevicePlatform.Android
                 ? "Tap to share or save a copy"
-                : "Tap to open the saved workbook";
+                : "Tap to open the saved report";
             SavedPathLabel.Text = $"Saved at: {outputPath}";
             ConversionWarningLabel.Text = parsed.monthlyWarning;
             ConversionWarningLabel.IsVisible = !string.IsNullOrWhiteSpace(parsed.monthlyWarning);
@@ -622,6 +643,8 @@ public partial class MainPage : ContentPage
             Spinner.IsVisible = false;
             Spinner.IsRunning = false;
             ConvertBtn.IsEnabled = _selectedFile != null;
+            OutputFormatPicker.IsEnabled = true;
+            MonthlyPdfLayoutPicker.IsEnabled = true;
             PickFileBtn.IsEnabled = true;
             DailyTemplateButton.IsEnabled = true;
             MonthlyTemplateButton.IsEnabled = true;
@@ -676,17 +699,17 @@ public partial class MainPage : ContentPage
             pathToOpen = Path.Combine(sharingDirectory, Path.GetFileName(outputPath));
             File.Copy(outputPath, pathToOpen, overwrite: true);
             await Share.Default.RequestAsync(new ShareFileRequest(
-                "Save or share attendance workbook",
+                "Save or share attendance report",
                 new ShareFile(pathToOpen)));
 #else
             await Launcher.Default.OpenAsync(new OpenFileRequest(
-                "Attendance workbook",
+                "Attendance report",
                 new ReadOnlyFile(pathToOpen)));
 #endif
         }
         catch (Exception error)
         {
-            await DisplayAlertAsync("Could not open the workbook", error.Message, "OK");
+            await DisplayAlertAsync("Could not open the report", error.Message, "OK");
         }
     }
 

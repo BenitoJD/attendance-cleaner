@@ -304,11 +304,11 @@ public class TemplateWriterRowTests
     }
 
     [Fact]
-    public void Reported_attendance_hours_are_used_before_punch_span()
+    public void Punch_span_preserves_minutes_when_reported_attendance_is_rounded()
     {
         var record = new AttendanceRecord("3", "A", "Male", Day1, "06:51", "19:00", 0, Attended: "12");
         var rows = TemplateWriter.BuildRows(new[] { record });
-        Assert.Equal("12:00", rows[0].TotalHours);
+        Assert.Equal("12:09", rows[0].TotalHours);
     }
 
     [Fact]
@@ -378,7 +378,7 @@ public class TemplateWriterExcelTests : IDisposable
     public void Header_row_matches_the_template_headers()
     {
         var ws = WriteAndOpenSheet();
-        var headers = TemplateSpec.Headers.Select((_, i) => ws.Cell(1, i + 1).GetString()).ToList();
+        var headers = TemplateSpec.Headers.Select((_, i) => ws.Cell(TemplateSpec.HeaderRow, i + 1).GetString()).ToList();
         Assert.Equal(TemplateSpec.Headers, headers);
     }
 
@@ -406,44 +406,44 @@ public class TemplateWriterExcelTests : IDisposable
     public void Numeric_id_and_serial_number_are_written_as_numbers()
     {
         var ws = WriteAndOpenSheet();
-        Assert.True(ws.Cell(2, 1).DataType == XLDataType.Number);
-        Assert.True(ws.Cell(2, 2).DataType == XLDataType.Number);
+        Assert.True(ws.Cell(TemplateSpec.FirstDataRow, 1).DataType == XLDataType.Number);
+        Assert.True(ws.Cell(TemplateSpec.FirstDataRow, 2).DataType == XLDataType.Number);
     }
 
     [Fact]
     public void Non_numeric_id_is_written_as_text()
     {
         var ws = WriteAndOpenSheet();
-        Assert.Equal("abc", ws.Cell(4, 2).GetString());
+        Assert.Equal("abc", ws.Cell(TemplateSpec.FirstDataRow + 2, 2).GetString());
     }
 
     [Fact]
     public void Absent_cells_are_left_blank_like_the_template()
     {
         var ws = WriteAndOpenSheet();
-        Assert.True(ws.Cell(3, 7).IsEmpty());
-        Assert.True(ws.Cell(3, 8).IsEmpty());
-        Assert.True(ws.Cell(3, 9).IsEmpty());
-        Assert.Equal(TemplateSpec.RemarkAbsent, ws.Cell(3, 10).GetString());
+        Assert.True(ws.Cell(TemplateSpec.FirstDataRow + 1, 7).IsEmpty());
+        Assert.True(ws.Cell(TemplateSpec.FirstDataRow + 1, 8).IsEmpty());
+        Assert.True(ws.Cell(TemplateSpec.FirstDataRow + 1, 9).IsEmpty());
+        Assert.Equal(TemplateSpec.RemarkAbsent, ws.Cell(TemplateSpec.FirstDataRow + 1, 10).GetString());
     }
 
     [Fact]
     public void Present_row_carries_punches_total_and_remark()
     {
         var ws = WriteAndOpenSheet();
-        Assert.Equal("06:51", ws.Cell(2, 7).GetString());
-        Assert.Equal("19:00", ws.Cell(2, 8).GetString());
-        Assert.Equal("12:09", ws.Cell(2, 9).GetString());
-        Assert.Equal(TemplateSpec.RemarkPresent, ws.Cell(2, 10).GetString());
+        Assert.Equal("06:51", ws.Cell(TemplateSpec.FirstDataRow, 7).GetString());
+        Assert.Equal("19:00", ws.Cell(TemplateSpec.FirstDataRow, 8).GetString());
+        Assert.Equal("12:09", ws.Cell(TemplateSpec.FirstDataRow, 9).GetString());
+        Assert.Equal(TemplateSpec.RemarkPresent, ws.Cell(TemplateSpec.FirstDataRow, 10).GetString());
     }
 
     [Fact]
-    public void Row_count_matches_records_plus_header()
+    public void Row_count_matches_records_plus_brand_and_header()
     {
         var ws = WriteAndOpenSheet();
         var last = ws.LastRowUsed();
         Assert.NotNull(last);
-        Assert.Equal(4, last.RowNumber());
+        Assert.Equal(TemplateSpec.FirstDataRow + 2, last.RowNumber());
     }
 
     [Fact]
@@ -455,6 +455,6 @@ public class TemplateWriterExcelTests : IDisposable
         Assert.Equal(TemplateSpec.Headers.Length, filter.Range.ColumnCount());
         Assert.Equal(4, filter.Range.RowCount()); // header + 3 data rows
         Assert.Equal(1, filter.Range.RangeAddress.FirstAddress.ColumnNumber);
-        Assert.Equal(1, filter.Range.RangeAddress.FirstAddress.RowNumber);
+        Assert.Equal(TemplateSpec.HeaderRow, filter.Range.RangeAddress.FirstAddress.RowNumber);
     }
 }

@@ -84,9 +84,9 @@ public static class MonthlyTemplateWriter
             decimal present = 0;
             decimal absent = 0;
             decimal leave = 0;
-            decimal dutyTotal = 0;
-            decimal overtimeTotal = 0;
-            decimal total = 0;
+            long dutyMinutes = 0;
+            long overtimeMinutes = 0;
+            long elapsedMinutes = 0;
             string? warning = null;
 
             foreach (var (date, record) in byDate)
@@ -98,16 +98,18 @@ public static class MonthlyTemplateWriter
                 if (creditHoliday)
                 {
                     present++;
-                    dutyTotal += MonthlyTemplateSpec.DutyHours;
-                    total += MonthlyTemplateSpec.DutyHours;
+                    dutyMinutes += (int)(MonthlyTemplateSpec.DutyHours * 60);
+                    // Keep holiday payroll credit separate from elapsed time when punches are available.
+                    elapsedMinutes += AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch)
+                        ?? (int)(MonthlyTemplateSpec.DutyHours * 60);
                 }
                 else if (isPresent)
                 {
                     present++;
-                    var hours = CalculateHours(record);
-                    dutyTotal += hours.Duty;
-                    overtimeTotal += hours.Overtime;
-                    total += hours.Duty + hours.Overtime;
+                    var minutes = CalculateMinutes(record);
+                    dutyMinutes += minutes.Duty;
+                    overtimeMinutes += minutes.Overtime;
+                    elapsedMinutes += TemplateWriter.WorkedMinutes(record) ?? 0;
                 }
                 else if (IsRegularDayOff(date, workingSaturdayDates)
                     || IsLeaveStatus(status))
@@ -165,9 +167,9 @@ public static class MonthlyTemplateWriter
                 present,
                 absent,
                 leave,
-                dutyTotal,
-                overtimeTotal,
-                total,
+                dutyMinutes / 60m,
+                overtimeMinutes / 60m,
+                elapsedMinutes / 60m,
                 warning));
         }
         return summaries;
@@ -382,7 +384,7 @@ public static class MonthlyTemplateWriter
                     ws.Cell(rowNumber, firstCol).Value = MonthlyTemplateSpec.DutyHours;
                     ws.Cell(rowNumber, firstCol + 1).Value = 0m;
                 }
-                else if (creditHoliday)
+                else if (creditHoliday && AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch) is null)
                 {
                     ws.Cell(rowNumber, firstCol).Value = MonthlyTemplateSpec.DutyStart.ToString(TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
                     ws.Cell(rowNumber, firstCol + 1).Value = MonthlyTemplateSpec.DutyEnd.ToString(TemplateSpec.TimeFormat, CultureInfo.InvariantCulture);
@@ -391,9 +393,9 @@ public static class MonthlyTemplateWriter
                 {
                     if (IsPresent(record))
                     {
-                        var hours = CalculateHours(record);
-                        ws.Cell(rowNumber, firstCol).Value = hours.Duty;
-                        ws.Cell(rowNumber, firstCol + 1).Value = hours.Overtime;
+                        var minutes = CalculateMinutes(record);
+                        ws.Cell(rowNumber, firstCol).Value = minutes.Duty / 60m;
+                        ws.Cell(rowNumber, firstCol + 1).Value = minutes.Overtime / 60m;
                     }
                 }
                 else
@@ -705,19 +707,21 @@ public static class MonthlyTemplateWriter
         workingSaturdayDates.Contains(date)
         || (!mandatoryHolidayDates.Contains(date) && !IsRegularDayOff(date, workingSaturdayDates));
 
-    private static (decimal Duty, decimal Overtime) CalculateHours(AttendanceRecord record)
+    private static (int Duty, int Overtime) CalculateMinutes(AttendanceRecord record)
     {
-        var total = (TemplateWriter.WorkedMinutes(record) ?? 0) / 60m;
-        var reportedOvertime = AttendanceTime.TryParseHours(record.Overtime, out var reported) && reported > 0 ? reported : 0;
-        var punchOvertime = GetPunchWindowHours(record, MonthlyTemplateSpec.DutyEnd, MonthlyTemplateSpec.OvertimeEnd);
-        var overtime = Math.Min(total, Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours,
+        var total = TemplateWriter.WorkedMinutes(record) ?? 0;
+        var dutyLimit = (int)(MonthlyTemplateSpec.DutyHours * 60);
+        var overtimeLimit = (int)(MonthlyTemplateSpec.MaximumOvertimeHours * 60);
+        var reportedOvertime = AttendanceTime.TryParseWorkedMinutes(record.Overtime, out var reported) ? reported : 0;
+        var punchOvertime = GetPunchWindowMinutes(record, MonthlyTemplateSpec.DutyEnd, MonthlyTemplateSpec.OvertimeEnd);
+        var overtime = Math.Min(total, Math.Min(overtimeLimit,
             reportedOvertime > 0 ? reportedOvertime : punchOvertime));
-        if (overtime == 0 && total > MonthlyTemplateSpec.DutyHours) overtime = Math.Min(MonthlyTemplateSpec.MaximumOvertimeHours, total - MonthlyTemplateSpec.DutyHours);
-        var duty = Math.Min(MonthlyTemplateSpec.DutyHours, Math.Max(0, total - overtime));
-        return (decimal.Round(duty, 2), decimal.Round(overtime, 2));
+        if (overtime == 0 && total > dutyLimit) overtime = Math.Min(overtimeLimit, total - dutyLimit);
+        var duty = Math.Min(dutyLimit, Math.Max(0, total - overtime));
+        return (duty, overtime);
     }
 
-    private static decimal GetPunchWindowHours(AttendanceRecord record, TimeOnly fromTime, TimeOnly toTime)
+    private static int GetPunchWindowMinutes(AttendanceRecord record, TimeOnly fromTime, TimeOnly toTime)
     {
         if (!AttendanceTime.TryParsePunch(record.InPunch, out var inTime) || !AttendanceTime.TryParsePunch(record.OutPunch, out var outTime)) return 0;
         var start = inTime.Hour * 60 + inTime.Minute;
@@ -727,8 +731,7 @@ public static class MonthlyTemplateWriter
         var windowEnd = toTime.Hour * 60 + toTime.Minute;
         var overlapStart = start > windowStart ? start : windowStart;
         var overlapEnd = end < windowEnd ? end : windowEnd;
-        var overlap = Math.Max(0, overlapEnd - overlapStart);
-        return overlap / 60m;
+        return Math.Max(0, overlapEnd - overlapStart);
     }
 
     private sealed record EmployeeGroup(string Id, string Name, int Order, List<AttendanceRecord> Records);

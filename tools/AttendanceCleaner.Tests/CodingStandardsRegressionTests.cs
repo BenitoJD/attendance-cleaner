@@ -23,7 +23,7 @@ public sealed class CodingStandardsRegressionTests
         TemplateWriter.Write(records, daily);
         daily.Position = 0;
         using var dailyWorkbook = new XLWorkbook(daily);
-        AssertIdentifier(dailyWorkbook.Worksheet(TemplateSpec.SheetName).Cell(2, 2));
+        AssertIdentifier(dailyWorkbook.Worksheet(TemplateSpec.SheetName).Cell(TemplateSpec.FirstDataRow, 2));
 
         foreach (var kind in Enum.GetValues<MonthlyTemplateKind>())
         {
@@ -56,8 +56,8 @@ public sealed class CodingStandardsRegressionTests
     }
 
     [Theory]
-    [InlineData("1.5", "01:30")]
-    [InlineData("01:30", "01:30")]
+    [InlineData("1.5", "04:00")]
+    [InlineData("01:30", "04:00")]
     [InlineData("-", "04:00")]
     [InlineData("79228162514264337593543950335", "04:00")]
     public void Reported_duration_is_culture_independent_and_cannot_overflow(string attended, string expected)

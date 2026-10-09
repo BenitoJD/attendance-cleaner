@@ -84,7 +84,7 @@ public sealed class MonthlyTemplateTests
     }
 
     [Fact]
-    public void Summary_splits_a_0700_to_1900_day_into_nine_duty_and_three_ot_hours()
+    public void Summary_keeps_elapsed_minutes_separate_from_nine_duty_and_three_ot_hours()
     {
         var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(
             SampleRecords(), Array.Empty<HolidayEntry>(), Month));
@@ -92,7 +92,7 @@ public sealed class MonthlyTemplateTests
         Assert.Equal(1, summary.PresentDays);
         Assert.Equal(9m, summary.TotalDutyHours);
         Assert.Equal(3m, summary.TotalOvertimeHours);
-        Assert.Equal(12m, summary.TotalHours);
+        Assert.Equal(12.15m, summary.TotalHours);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public sealed class MonthlyTemplateTests
         Assert.Equal(1, summary.PresentDays);
         Assert.Equal(9m, summary.TotalDutyHours);
         Assert.Equal(0m, summary.TotalOvertimeHours);
-        Assert.Equal(9m, summary.TotalHours);
+        Assert.Equal(12.30m, summary.TotalHours);
 
         using var stream = new MemoryStream();
         MonthlyTemplateWriter.Write(records, holidays, MonthlyTemplateKind.DutyAndOvertime, stream);
@@ -171,7 +171,7 @@ public sealed class MonthlyTemplateTests
     }
 
     [Fact]
-    public void In_out_holiday_uses_fixed_nine_hour_shift_even_with_source_punches()
+    public void In_out_holiday_preserves_actual_punches_and_elapsed_time()
     {
         var records = new[]
         {
@@ -187,9 +187,9 @@ public sealed class MonthlyTemplateTests
         var attendance = workbook.Worksheet("Attendance");
         const int september14FirstColumn = 31;
 
-        Assert.Equal("07:00", attendance.Cell(6, september14FirstColumn).GetString());
-        Assert.Equal("16:00", attendance.Cell(6, september14FirstColumn + 1).GetString());
-        Assert.Equal(9m, attendance.Cell(6, 65).GetValue<decimal>());
+        Assert.Equal("06:45", attendance.Cell(6, september14FirstColumn).GetString());
+        Assert.Equal("19:03", attendance.Cell(6, september14FirstColumn + 1).GetString());
+        Assert.Equal(12.30m, attendance.Cell(6, 65).GetValue<decimal>());
         Assert.Equal(1, attendance.Cell(6, 67).GetValue<int>());
     }
 

@@ -197,8 +197,8 @@ public class IdAndFormatRobustnessTests
 
             using var workbook = new XLWorkbook(path);
             var ws = workbook.Worksheets.Single();
-            Assert.Equal("0013", ws.Cell(2, 2).GetString());
-            Assert.True(ws.Cell(2, 2).DataType == XLDataType.Text);
+            Assert.Equal("0013", ws.Cell(TemplateSpec.FirstDataRow, 2).GetString());
+            Assert.True(ws.Cell(TemplateSpec.FirstDataRow, 2).DataType == XLDataType.Text);
         }
         finally
         {
@@ -219,8 +219,8 @@ public class IdAndFormatRobustnessTests
 
             using var workbook = new XLWorkbook(path);
             var ws = workbook.Worksheets.Single();
-            Assert.True(ws.Cell(2, 2).DataType == XLDataType.Number);
-            Assert.Equal(13, ws.Cell(2, 2).GetDouble());
+            Assert.True(ws.Cell(TemplateSpec.FirstDataRow, 2).DataType == XLDataType.Number);
+            Assert.Equal(13, ws.Cell(TemplateSpec.FirstDataRow, 2).GetDouble());
         }
         finally
         {

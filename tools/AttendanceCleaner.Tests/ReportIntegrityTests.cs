@@ -10,10 +10,10 @@ public sealed class ReportIntegrityTests
     private static readonly DateOnly Month = new(2026, 9, 1);
 
     [Theory]
-    [InlineData("12", "12:00")]
-    [InlineData("11:30", "11:30")]
+    [InlineData("12", "12:09")]
+    [InlineData("11:30", "12:09")]
     [InlineData("79228162514264337593543950335", "12:09")]
-    public void Daily_and_dashboard_share_reported_duration_and_overflow_fallback(string attended, string expected)
+    public void Daily_and_dashboard_preserve_punch_minutes_despite_source_duration(string attended, string expected)
     {
         var record = Record() with { InPunch = "06:51", OutPunch = "19:00", Attended = attended };
         var rows = TemplateWriter.BuildRows([record]);
@@ -35,14 +35,14 @@ public sealed class ReportIntegrityTests
         var capped = Assert.Single(MonthlyTemplateWriter.BuildSummaries([longShift], [], Month));
         Assert.Equal(9m, capped.TotalDutyHours);
         Assert.Equal(3m, capped.TotalOvertimeHours);
-        Assert.Equal(12m, capped.TotalHours);
+        Assert.Equal(15m, capped.TotalHours);
     }
 
     [Theory]
     [InlineData("2", "3", "07:00", "09:00", 2)]
     [InlineData("0.5", "3", "18:00", "18:30", 0.5)]
-    [InlineData("1", "0", "16:00", "19:00", 1)]
-    public void Overtime_cannot_create_more_hours_than_the_attended_duration(
+    [InlineData("1", "0", "16:00", "19:00", 3)]
+    public void Overtime_cannot_create_more_hours_than_the_punch_duration(
         string attended, string overtime, string start, string end, double expected)
     {
         var record = Record() with

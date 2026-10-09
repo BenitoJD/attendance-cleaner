@@ -1,8 +1,8 @@
 # Attendance Report Studio
 
-A .NET MAUI app that turns raw attendance exports into clear daily and monthly Excel reports, with summaries and a PDF dashboard.
+A .NET MAUI app that turns raw attendance exports into clear daily and monthly Excel or PDF reports, with summaries and a PDF dashboard.
 
-**Flow:** choose a Daily or Monthly template → select the `.xls` export from the attendance software → convert and save the finished `.xlsx`. Monthly reports can use either the Duty/OT or IN/OUT layout and include an editable Holiday Details sheet.
+**Flow:** choose a Daily or Monthly template → select the `.xls` export from the attendance software → choose Excel (`.xlsx`) or PDF (`.pdf`) → convert and save. Excel is selected by default. Monthly reports can use either the Duty/OT or IN/OUT layout and include an editable Holiday Details sheet.
 
 ```
 Sl.No | ID No | Name | Gender | Date | Day | In punch | Out punch | Total hours | Remarks
@@ -19,7 +19,11 @@ After converting, the results screen has two tabs:
 
 **Save dashboard as PDF** generates a landscape A4 report with all of the above (KPIs, chart, employee table, page numbers) and opens the save dialog — suggested name `Attendance Dashboard <Month Year>.pdf`. PDF export is available in the Windows build.
 
-Daily Excel and dashboard worked hours prefer a positive reported Attended duration, falling back to the punch interval. Monthly duty/OT limits still apply separately; overtime never exceeds the available total duration. Average punch times account for midnight and overnight departures. PDF trends use panels of at most 31 dates so longer ranges remain readable.
+Daily reports, dashboard worked hours, and monthly IN/OUT Total Hours use the punch interval whenever both punches exist, including overnight shifts. A positive reported Attended duration is used only when a punch pair is missing. Monthly calculations retain whole minutes until export; numeric hours are displayed as decimals (8.50 means 8 hours 30 minutes). Monthly duty/OT limits apply separately and do not cap elapsed Total Hours; overtime never exceeds the available duration. Mandatory holidays retain their nine-hour payroll credit; IN/OUT retains actual complete punches and elapsed time, otherwise showing the credited shift. Average punch times account for midnight and overnight departures. PDF trends use panels of at most 31 dates so longer ranges remain readable.
+
+Daily Excel and PDF reports include the company name and logo above the table and use the monthly palette: pastel headers, green IN punches, blue OUT punches, and yellow total hours. Remarks use green for Present, blue for Absent, and peach for an incomplete punch pair. The daily columns and calculations remain the same.
+
+Template PDFs preserve the selected daily or monthly layout and include Holiday Details. Monthly PDFs offer **Full month (A1 landscape)**, selected by default in the app, or **Weekly (A4 landscape)**. Full month keeps every date and summary column together on a large page, with selectable text and vector table lines for sharp zooming. Larger employee lists continue vertically with repeated headers. Weekly shows seven days per section with repeated employee details and totals. Holiday Details uses standard A4 pages in either layout. Daily PDFs remain A4 landscape.
 
 Cancelling the Windows Save As dialog creates no file. Other platforms save to the app's fallback directory.
 

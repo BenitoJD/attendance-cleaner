@@ -27,7 +27,7 @@ public class AdversarialContentTests
             var ws = wb.Worksheets.Single();
             for (var i = 0; i < names.Length; i++)
             {
-                Assert.Equal(names[i], ws.Cell(i + 2, 3).GetString());
+                Assert.Equal(names[i], ws.Cell(i + TemplateSpec.FirstDataRow, 3).GetString());
             }
         }
         finally
@@ -52,7 +52,7 @@ public class AdversarialContentTests
             var ws = wb.Worksheets.Single();
             for (var i = 0; i < hostile.Length; i++)
             {
-                var cell = ws.Cell(i + 2, 3);
+                var cell = ws.Cell(i + TemplateSpec.FirstDataRow, 3);
                 Assert.Equal(XLDataType.Text, cell.DataType);
                 Assert.Equal(hostile[i], cell.GetString());
                 Assert.Equal("", cell.FormulaA1); // empty means "no formula"
@@ -194,7 +194,7 @@ public class AdversarialContentTests
 
             for (var i = 0; i < expected.Count; i++)
             {
-                var row = i + 2;
+                var row = i + TemplateSpec.FirstDataRow;
                 Assert.Equal(expected[i].SlNo, ws.Cell(row, 1).GetValue<int>());
                 Assert.Equal(expected[i].Name, ws.Cell(row, 3).GetString());
                 Assert.Equal(expected[i].Gender, ws.Cell(row, 4).GetString());

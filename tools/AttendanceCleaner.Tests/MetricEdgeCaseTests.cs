@@ -24,11 +24,12 @@ public sealed class MetricEdgeCaseTests
     [InlineData("0.001", "00:00")]
     [InlineData("23:59:30", "24:00")]
     [InlineData("25:00", "25:00")]
-    public void Decimal_and_hour_minute_durations_share_daily_and_dashboard_totals(string attended, string expected)
+    public void Reported_decimal_and_hour_minute_durations_are_fallbacks_for_missing_punches(string attended, string expected)
     {
         var record = Record() with { Attended = attended };
-        Assert.Equal(expected, Assert.Single(TemplateWriter.BuildRows([record])).TotalHours);
-        Assert.Equal(expected, AttendanceAnalytics.Build([record]).AverageHours);
+        Assert.Equal(expected, Assert.Single(TemplateWriter.BuildRows([record with { OutPunch = null }])).TotalHours);
+        Assert.Equal("09:00", Assert.Single(TemplateWriter.BuildRows([record])).TotalHours);
+        Assert.Equal("09:00", AttendanceAnalytics.Build([record]).AverageHours);
     }
 
     [Theory]

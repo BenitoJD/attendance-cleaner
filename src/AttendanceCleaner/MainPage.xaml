@@ -54,7 +54,7 @@
                     <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                         <Label Text="Attendance Report Studio" FontSize="23" FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Label Text="Turn raw attendance exports into clear daily and monthly Excel reports."
+                        <Label Text="Turn raw attendance exports into clear daily and monthly Excel or PDF reports."
                                FontSize="13" LineBreakMode="WordWrap"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
@@ -200,6 +200,35 @@
                                 FontSize="16" FontAttributes="Bold"
                                 CornerRadius="14" HeightRequest="52"
                                 Clicked="OnPickFileClicked" />
+
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Save as" FontSize="13" FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                            <Picker x:Name="OutputFormatPicker" Title="Choose a format" SelectedIndexChanged="OnOutputFormatChanged"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                                    SemanticProperties.Description="Report file format">
+                                <Picker.Items>
+                                    <x:String>Excel (.xlsx)</x:String>
+                                    <x:String>PDF (.pdf)</x:String>
+                                </Picker.Items>
+                            </Picker>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout x:Name="MonthlyPdfLayoutPanel" IsVisible="False" Spacing="4">
+                            <Label Text="Monthly PDF layout" FontSize="13" FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                            <Picker x:Name="MonthlyPdfLayoutPicker" Title="Choose a PDF layout"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                                    SemanticProperties.Description="Monthly PDF page layout">
+                                <Picker.Items>
+                                    <x:String>Full month — large page (A1)</x:String>
+                                    <x:String>Weekly — standard page (A4)</x:String>
+                                </Picker.Items>
+                            </Picker>
+                            <Label Text="Full month keeps every date together. Larger employee lists continue on another page."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </VerticalStackLayout>
 
                         <Button x:Name="ConvertBtn"
                                 Text="Convert &amp; save"

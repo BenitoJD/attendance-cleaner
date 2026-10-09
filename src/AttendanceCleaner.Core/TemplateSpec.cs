@@ -10,6 +10,8 @@ public static class TemplateSpec
     // --- output layout (mirrors Attendance_New_Template) ---
 
     public const string SheetName = "Attendance";
+    public const int HeaderRow = 2;
+    public const int FirstDataRow = HeaderRow + 1;
 
     public static readonly string[] Headers =
     {

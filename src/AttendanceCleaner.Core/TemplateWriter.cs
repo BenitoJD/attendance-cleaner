@@ -69,13 +69,13 @@ public static class TemplateWriter
 
         for (var c = 0; c < TemplateSpec.Headers.Length; c++)
         {
-            var header = ws.Cell(1, c + 1);
+            var header = ws.Cell(TemplateSpec.HeaderRow, c + 1);
             header.Value = TemplateSpec.Headers[c];
             header.Style.Font.Bold = true;
         }
-        ws.SheetView.FreezeRows(1);
+        ws.SheetView.FreezeRows(TemplateSpec.HeaderRow);
 
-        var row = 2;
+        var row = TemplateSpec.FirstDataRow;
         foreach (var r in BuildRows(records))
         {
             ws.Cell(row, 1).Value = r.SlNo;
@@ -88,6 +88,12 @@ public static class TemplateWriter
             if (r.OutPunch != null) ws.Cell(row, 8).Value = r.OutPunch;
             if (r.TotalHours != null) ws.Cell(row, 9).Value = r.TotalHours;
             ws.Cell(row, 10).Value = r.Remark;
+            ws.Cell(row, 10).Style.Fill.BackgroundColor = XLColor.FromHtml(r.Remark switch
+            {
+                TemplateSpec.RemarkPresent => "#E2EFDA",
+                TemplateSpec.RemarkAbsent => "#B4C7E7",
+                _ => "#FCE4D6",
+            });
             row++;
         }
 
@@ -97,10 +103,43 @@ public static class TemplateWriter
             ws.Column(column).Width = width;
         }
 
-        // filter dropdown on every column, covering exactly the header and the data rows
-        if (row > 2)
+        // Match the monthly workbook palette without changing the daily layout or values.
+        var headerColors = new[]
         {
-            ws.Range(1, 1, row - 1, TemplateSpec.Headers.Length).SetAutoFilter();
+            "#FFF2CC", "#FFF2CC", "#FFF2CC", "#FFF2CC", "#E2EFDA",
+            "#DDEBF7", "#FFF2CC", "#FCE4D6", "#FFF2CC", "#B4C7E7",
+        };
+        for (var column = 1; column <= headerColors.Length; column++)
+            ws.Cell(TemplateSpec.HeaderRow, column).Style.Fill.BackgroundColor = XLColor.FromHtml(headerColors[column - 1]);
+        ws.Range(TemplateSpec.HeaderRow, 1, row - 1, TemplateSpec.Headers.Length).Style.Font.FontColor = XLColor.Black;
+        if (row > TemplateSpec.FirstDataRow)
+        {
+            ws.Range(TemplateSpec.FirstDataRow, 7, row - 1, 7).Style.Fill.BackgroundColor = XLColor.FromHtml("#E2EFDA");
+            ws.Range(TemplateSpec.FirstDataRow, 8, row - 1, 8).Style.Fill.BackgroundColor = XLColor.FromHtml("#DDEBF7");
+            ws.Range(TemplateSpec.FirstDataRow, 9, row - 1, 9).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF2CC");
+        }
+
+        // filter dropdown on every column, covering exactly the header and the data rows
+        if (row > TemplateSpec.FirstDataRow)
+        {
+            ws.Range(TemplateSpec.HeaderRow, 1, row - 1, TemplateSpec.Headers.Length).SetAutoFilter();
+        }
+
+        // Add branding after auto-fitting so the banner does not widen the attendance columns.
+        var banner = ws.Range(1, 2, 1, TemplateSpec.Headers.Length).Merge();
+        banner.Value = $"{MonthlyTemplateSpec.CompanyName} - Daily Attendance Report";
+        banner.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFF00");
+        banner.Style.Font.FontColor = XLColor.Black;
+        banner.Style.Font.Bold = true;
+        banner.Style.Font.FontSize = 12;
+        banner.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        ws.Cell(1, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#E2EFDA");
+        ws.Row(1).Height = 30;
+        using (var logo = typeof(TemplateWriter).Assembly.GetManifestResourceStream(
+            "AttendanceCleaner.Core.DakshinakTemplateLogo.png"))
+        {
+            if (logo is not null)
+                ws.AddPicture(logo).MoveTo(ws.Cell(1, 1)).WithSize(47, 30);
         }
 
         workbook.SaveAs(output);
@@ -119,12 +158,13 @@ public static class TemplateWriter
     private static string? TotalHours(AttendanceRecord record) =>
         WorkedMinutes(record) is { } minutes ? AttendanceTime.FormatMinutes(minutes) : null;
 
-    /// <summary>Use the export's attended duration consistently before falling back to punches.</summary>
+    /// <summary>Prefer elapsed punch time; use reported attendance only when a punch pair is unavailable.</summary>
     internal static int? WorkedMinutes(AttendanceRecord record)
     {
-        if (AttendanceTime.TryParseWorkedMinutes(record.Attended, out var minutes)) return minutes;
+        if (AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch) is { } elapsed)
+            return elapsed;
 
-        return AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch);
+        return AttendanceTime.TryParseWorkedMinutes(record.Attended, out var minutes) ? minutes : null;
     }
 
     /// <summary>Count repeated observations once and refuse contradictory employee/day records.</summary>

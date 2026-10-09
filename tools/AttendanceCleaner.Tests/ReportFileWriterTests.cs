@@ -92,8 +92,8 @@ public sealed class ReportFileWriterTests
             TemplateWriter.WriteToFile(
                 [new("007", "Example", "", new DateOnly(2026, 9, 1), "07:00", "16:00", 0)], path);
             using var workbook = new XLWorkbook(path);
-            Assert.Equal("007", workbook.Worksheets.Single().Cell(2, 2).GetString());
-            Assert.Equal("09:00", workbook.Worksheets.Single().Cell(2, 9).GetString());
+            Assert.Equal("007", workbook.Worksheets.Single().Cell(TemplateSpec.FirstDataRow, 2).GetString());
+            Assert.Equal("09:00", workbook.Worksheets.Single().Cell(TemplateSpec.FirstDataRow, 9).GetString());
             Assert.Equal([path], Directory.GetFiles(directory));
         }
         finally
