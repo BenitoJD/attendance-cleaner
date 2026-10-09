@@ -527,7 +527,7 @@ public partial class MainPage : ContentPage
                     ? report.EmployeeTotals?.Any(total => total.AbsentDays is not null
                         || total.AttendedDays is not null
                         || total.LeaveDays is not null) == true
-                        ? "Monthly totals use the report's employee counts. No daily leave/absence codes are available, so dates cannot be identified and totals may not match the calendar."
+                        ? "Daily leave/absence codes are unavailable. Consistent source totals are used; inconsistent totals are calculated from punches and the calendar."
                         : "This report has no daily leave/absence codes or summary counts. Monthly absence and leave are inferred from punches and the calendar."
                     : "";
                 if (isMonthlyReport)
@@ -543,6 +543,8 @@ public partial class MainPage : ContentPage
                 var summaries = isMonthlyReport
                     ? MonthlyTemplateWriter.BuildSummaries(report.Records, holidays, dates[0], report.EmployeeTotals)
                     : null;
+                if (summaries?.Any(summary => summary.Warning is not null) == true)
+                    monthlyWarning += " Some source day totals overlap or do not match the exported dates. Affected employees are marked in Remarks; each exported date is counted once.";
                 return (report, dates, fileName, monthlyWarning, holidays, dashboard, summaries);
             });
 
@@ -573,12 +575,12 @@ public partial class MainPage : ContentPage
                     var workbookBytes = ms.ToArray();
                     using var previewStream = new MemoryStream(workbookBytes, writable: false);
                     monthlyPreview = MonthlyTemplateWriter.ReadPreview(previewStream);
-                    File.WriteAllBytes(outputPath, workbookBytes);
+                    ReportFileWriter.WriteBytes(outputPath, workbookBytes);
                 }
                 else
                 {
                     TemplateWriter.Write(parsed.report.Records, ms);
-                    File.WriteAllBytes(outputPath, ms.ToArray());
+                    ReportFileWriter.WriteBytes(outputPath, ms.ToArray());
                 }
                 return (Rows: built, Summaries: summaries, MonthlyPreview: monthlyPreview);
             });
@@ -890,7 +892,7 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            await Task.Run(() => File.WriteAllBytes(outputPath, bytes));
+            await Task.Run(() => ReportFileWriter.WriteBytes(outputPath, bytes));
             DashStatus.Text = $"Dashboard saved to: {outputPath}";
         }
         catch (TypeInitializationException)

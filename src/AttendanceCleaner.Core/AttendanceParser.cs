@@ -62,15 +62,14 @@ public static partial class AttendanceParser
         else
         {
             preambleLength = 0;
-            var prefix = Encoding.ASCII.GetString(bytes[..Math.Min(4096, bytes.Length)]);
-            var charset = Regex.Match(prefix, "<meta\\b[^>]*\\bcharset\\s*=\\s*[\"']?\\s*(?<name>[a-z0-9._-]+)", RegexOptions.IgnoreCase);
+            var charset = DeclaredHtmlCharset(bytes);
             try
             {
-                encoding = charset.Success
-                    ? Encoding.GetEncoding(charset.Groups["name"].Value, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)
+                encoding = charset is not null
+                    ? Encoding.GetEncoding(charset, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)
                     : new UTF8Encoding(false, true);
             }
-            catch (ArgumentException exception)
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
             {
                 throw new InvalidDataException("The export declares an unsupported text encoding. Export the report again using Unicode or UTF-8.", exception);
             }
@@ -83,6 +82,28 @@ public static partial class AttendanceParser
         {
             throw new InvalidDataException("The export contains invalid text for its encoding. Download the report again or export it using Unicode or UTF-8.", exception);
         }
+    }
+
+    private static string? DeclaredHtmlCharset(ReadOnlySpan<byte> bytes)
+    {
+        // Charset names and HTML tags are ASCII. Head tags may be omitted in HTML,
+        // so read actual metadata before the body or first table, including large stylesheets.
+        var document = new HtmlDocument { OptionReadEncoding = false };
+        document.LoadHtml(Encoding.ASCII.GetString(bytes));
+        var contentStart = document.DocumentNode.SelectSingleNode("//body|//table")?.StreamPosition ?? int.MaxValue;
+        var metadata = document.DocumentNode.SelectNodes("//meta");
+        if (metadata is null) return null;
+        foreach (var meta in metadata)
+        {
+            if (meta.StreamPosition >= contentStart) continue;
+            var charset = System.Net.WebUtility.HtmlDecode(meta.GetAttributeValue("charset", "")).Trim();
+            if (charset.Length > 0) return charset;
+            if (!Same(meta.GetAttributeValue("http-equiv", ""), "Content-Type")) continue;
+            var content = System.Net.WebUtility.HtmlDecode(meta.GetAttributeValue("content", ""));
+            var match = Regex.Match(content, @"(?:^|;)\s*charset\s*=\s*[""']?(?<name>[^\s;""']+)", RegexOptions.IgnoreCase);
+            if (match.Success) return match.Groups["name"].Value;
+        }
+        return null;
     }
 
     /// <summary>
@@ -108,14 +129,18 @@ public static partial class AttendanceParser
 
     public static ParsedReport Parse(string html)
     {
-        if (!html.Contains("</html", StringComparison.OrdinalIgnoreCase)
-            && !html.Contains("</body", StringComparison.OrdinalIgnoreCase))
+        // Text in comments, scripts, and styles cannot prove the download is complete.
+        var markup = Regex.Replace(html, @"<!--[\s\S]*?(?:-->|$)|<(script|style)\b[^>]*>[\s\S]*?(?:</\1\s*>|$)",
+            "", RegexOptions.IgnoreCase);
+        var hasClosingDocumentTag = Regex.Matches(markup, @"<(?:""[^""]*""|'[^']*'|[^'""<>])*>")
+            .Any(tag => Regex.IsMatch(tag.Value, @"^</(?:html|body)\s*>$", RegexOptions.IgnoreCase));
+        if (!hasClosingDocumentTag)
         {
             throw new InvalidDataException(
                 "This file looks incomplete (possibly a failed download). Please download the report from the attendance software again.");
         }
 
-        var doc = new HtmlDocument();
+        var doc = new HtmlDocument { OptionReadEncoding = false };
         doc.LoadHtml(NormalizeHtml(html));
 
         var tables = doc.DocumentNode.SelectNodes("//table")?
@@ -149,33 +174,64 @@ public static partial class AttendanceParser
     }
 
     private static bool Same(string? a, string b) =>
-        string.Equals(a?.Trim(), b, StringComparison.OrdinalIgnoreCase);
+        string.Equals(Regex.Replace(a ?? "", @"\s+", " ").Trim(),
+            Regex.Replace(b, @"\s+", " ").Trim(), StringComparison.OrdinalIgnoreCase);
 
     // --- Daily report: title table, then a table of one row per employee ---
 
     private static List<string>? FindDailyHeader(List<List<List<string>>> tables) =>
         tables.SelectMany(t => t)
-            .FirstOrDefault(r => Same(Cell(r, 1), LabelPersonId) && r.Any(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase)));
+            .FirstOrDefault(IsDailyHeader);
+
+    private static bool IsDailyHeader(List<string> row) =>
+        FindIndex(row, LabelNo) >= 0 && FindIndex(row, LabelPersonId) >= 0
+        && row.Any(cell => cell.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase));
 
     private static List<AttendanceRecord> ParseDaily(List<List<List<string>>> tables, List<string> header)
     {
-        int ixNo = FindIndex(header, LabelNo);
-        int ixId = FindIndex(header, LabelPersonId);
-        int ixName = FindIndex(header, LabelName);
-        int ixGender = FindIndex(header, LabelGender);
-        int ixDate = FindIndex(header, LabelDate);
-        int ixIn = header.FindIndex(c => c.StartsWith(LabelCheckInPrefix, StringComparison.OrdinalIgnoreCase));
-        int ixOut = header.FindIndex(c => c.StartsWith("Check-out", StringComparison.OrdinalIgnoreCase));
-        int ixAttended = FindIndex(header, LabelAttended);
-        if (new[] { ixNo, ixId, ixName, ixDate, ixIn, ixOut }.Any(index => index < 0))
-            throw new InvalidDataException("The daily report is missing an employee, date, or check-in/check-out column.");
+        int ixNo = -1, ixId = -1, ixName = -1, ixGender = -1, ixDate = -1, ixIn = -1, ixOut = -1;
+        int ixAttended = -1, ixOvertime = -1, ixStatus = -1;
+        int headerWidth = 0;
+        int[] additionalPunchColumns = [];
+        void ReadHeader(List<string> current)
+        {
+            ixNo = FindIndex(current, LabelNo);
+            ixId = FindIndex(current, LabelPersonId);
+            ixName = FindIndex(current, LabelName);
+            ixGender = FindIndex(current, LabelGender);
+            ixDate = FindIndex(current, LabelDate);
+            ixIn = current.FindIndex(IsFirstCheckIn);
+            ixOut = current.FindIndex(IsFirstCheckOut);
+            ixAttended = FindIndex(current, LabelAttended);
+            ixOvertime = current.FindIndex(IsOvertimeLabel);
+            ixStatus = FindIndex(current, LabelStatus);
+            headerWidth = current.Count;
+            additionalPunchColumns = current.Select((label, column) => (label, column))
+                .Where(cell => IsAdditionalPunch(cell.label)).Select(cell => cell.column).ToArray();
+            if (new[] { ixNo, ixId, ixName, ixDate, ixIn, ixOut }.Any(index => index < 0))
+                throw new InvalidDataException("The daily report is missing an employee, date, or check-in/check-out column.");
+        }
+        ReadHeader(header);
 
         var records = new List<AttendanceRecord>();
         int order = 0;
+        var hasHeader = false;
         foreach (var row in tables.SelectMany(t => t))
         {
+            if (IsDailyHeader(row))
+            {
+                ReadHeader(row);
+                hasHeader = true;
+                continue;
+            }
+            if (!hasHeader) continue;
             if (!int.TryParse(Cell(row, ixNo), out _))
             {
+                var looksLikeEmployee = !string.IsNullOrWhiteSpace(Cell(row, ixId)) && !string.IsNullOrWhiteSpace(Cell(row, ixName))
+                    && new[] { ixDate, ixIn, ixOut, ixAttended, ixOvertime, ixStatus }
+                        .Any(column => NormalizeMetric(Cell(row, column)) is not null);
+                if (TryParseDate(Cell(row, ixDate), out _) || looksLikeEmployee)
+                    throw new InvalidDataException($"The daily attendance row for employee '{Cell(row, ixId)}' has an invalid or missing row number.");
                 continue; // title rows, note rows, empty rows
             }
 
@@ -185,18 +241,27 @@ public static partial class AttendanceParser
                     $"Invalid attendance date '{Cell(row, ixDate)}' for employee '{Cell(row, ixId)}' ({Cell(row, ixName)}). " +
                     "Use day-month-year or year-month-day dates and export the report again.");
             }
-            if (row.Count <= Math.Max(ixIn, ixOut))
+            if (row.Count <= new[] { ixNo, ixId, ixName, ixDate, ixIn, ixOut, ixAttended, ixOvertime, ixStatus }.Max())
                 throw new InvalidDataException($"The attendance row for employee '{Cell(row, ixId)}' on {date:dd-MM-yyyy} is incomplete.");
+            if (row.Skip(headerWidth).Any(value => !IsEmptyMetricPadding(value)))
+                throw new InvalidDataException($"The daily attendance row for employee '{Cell(row, ixId)}' on {date:dd-MM-yyyy} contains data without a column heading.");
+            var id = Cell(row, ixId);
+            var name = Cell(row, ixName);
+            ValidateIdentity(id, name);
+            if (additionalPunchColumns.Any(column => !IsEmptyMetricPadding(Cell(row, column))))
+                throw AdditionalPunchError(id, name, date);
 
             records.Add(new AttendanceRecord(
-                Id: Cell(row, ixId),
-                Name: Cell(row, ixName),
+                Id: id,
+                Name: name,
                 Gender: Cell(row, ixGender) is { Length: > 0 } g ? g : TemplateSpec.UnknownGender,
                 Date: date,
-                InPunch: NormalizePunch(Cell(row, ixIn)),
-                OutPunch: NormalizePunch(Cell(row, ixOut)),
+                InPunch: ReadPunch(Cell(row, ixIn), id, name, date, "Check-in"),
+                OutPunch: ReadPunch(Cell(row, ixOut), id, name, date, "Check-out"),
                 Order: order++,
-                Attended: NormalizeMetric(Cell(row, ixAttended))));
+                Attended: ReadHours(Cell(row, ixAttended), id, name, date, LabelAttended),
+                Overtime: ReadHours(Cell(row, ixOvertime), id, name, date, LabelOvertime),
+                Status: NormalizeMetric(Cell(row, ixStatus))));
         }
         return records;
     }
@@ -225,12 +290,12 @@ public static partial class AttendanceParser
             var finalDayColumn = dayByColumn!.Keys.Max();
             if (row.Count <= finalDayColumn)
                 throw new InvalidDataException($"The monthly '{Cell(row, 0)}' row for employee '{id}' is incomplete.");
-            if (row.Skip(finalDayColumn + 1).Any(value => NormalizeMetric(value) is { } metric
-                && !(decimal.TryParse(metric, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) && number == 0)))
+            if (row.Skip(finalDayColumn + 1).Any(value => !IsEmptyMetricPadding(value)))
                 throw new InvalidDataException($"The monthly '{Cell(row, 0)}' row for employee '{id}' contains data without a date column.");
             foreach (var col in dayByColumn.Keys)
             {
                 var value = Cell(row, col);
+                ValidateMetricValue(Cell(row, 0), value, id, name, dayByColumn[col]);
                 if (values.TryGetValue(col, out var previous) && !MetricValuesEqual(Cell(row, 0), previous, value))
                     throw new InvalidDataException($"Conflicting monthly '{Cell(row, 0)}' rows for employee '{id}' ({name}) on {dayByColumn[col]:dd-MM-yyyy}.");
                 values[col] = value;
@@ -252,8 +317,9 @@ public static partial class AttendanceParser
                 overtime!.TryGetValue(col, out var otHours);
                 statuses!.TryGetValue(col, out var status);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
-                    NormalizePunch(tin), NormalizePunch(tout), Order: blockIndex,
-                    Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
+                    ReadPunch(tin, id, name, date, LabelCheckIn), ReadPunch(tout, id, name, date, LabelCheckOut), Order: blockIndex,
+                    Attended: ReadHours(totalHours, id, name, date, LabelAttended),
+                    Overtime: ReadHours(otHours, id, name, date, LabelOvertime), Status: NormalizeMetric(status)));
             }
         }
 
@@ -276,8 +342,6 @@ public static partial class AttendanceParser
             }
             else if (Same(label, LabelDate) && blockIndex >= 0)
             {
-                if (hasDates)
-                    throw new InvalidDataException($"Repeated monthly date rows for employee '{id}' ({name}). Export the report again.");
                 var days = new Dictionary<int, int>();
                 for (int c = 1; c < row.Count; c++)
                 {
@@ -291,14 +355,25 @@ public static partial class AttendanceParser
                         || row.Skip(c + 1).Any(cell => NormalizeMetric(cell) is not null))
                         throw new InvalidDataException($"Invalid monthly date column '{Cell(row, c)}'. Expected a day number.");
                 }
-                dayByColumn = MapDayColumns(range, days);
+                var dates = MapDayColumns(range, days);
+                if (hasDates && !dayByColumn!.OrderBy(pair => pair.Key).SequenceEqual(dates.OrderBy(pair => pair.Key)))
+                    throw new InvalidDataException($"Conflicting monthly date rows for employee '{id}' ({name}). Export the report again.");
+                dayByColumn = dates;
                 hasDates = true;
             }
-            else if (Same(label, LabelCheckIn) && dayByColumn != null)
+            else if (blockIndex >= 0 && dayByColumn is null && IsMetricLabel(label))
+            {
+                throw new InvalidDataException($"The monthly '{label}' row for employee '{id}' ({name}) appears before its date columns.");
+            }
+            else if (IsAdditionalPunch(label) && blockIndex >= 0)
+            {
+                if (row.Skip(1).Any(value => !IsEmptyMetricPadding(value))) throw AdditionalPunchError(id, name);
+            }
+            else if (IsFirstCheckIn(label) && dayByColumn != null)
             {
                 ReadMetric(row, ins!);
             }
-            else if (Same(label, LabelCheckOut) && dayByColumn != null)
+            else if (IsFirstCheckOut(label) && dayByColumn != null)
             {
                 ReadMetric(row, outs!);
             }
@@ -332,7 +407,7 @@ public static partial class AttendanceParser
         {
             var index = FindIndex(row, label);
             return index < 0 ? "" : row.Skip(index + 1)
-                .TakeWhile(cell => !BlockFieldLabels.Contains(cell))
+                .TakeWhile(cell => !BlockFieldLabels.Any(field => Same(cell, field)))
                 .FirstOrDefault(cell => !string.IsNullOrWhiteSpace(cell)) ?? "";
         }
     }
@@ -347,28 +422,40 @@ public static partial class AttendanceParser
                 var row = table[rowIndex];
                 var nameColumn = FindIndex(row, LabelName);
                 if (!Same(Cell(row, 0), LabelNo) || FindIndex(row, LabelPersonId) < 0 || nameColumn < 0) continue;
-                var dayColumns = new List<int>();
-                for (int c = nameColumn + 2; c < row.Count; c++)
-                {
-                    if (int.TryParse(Cell(row, c), out _))
-                    {
-                        dayColumns.Add(c);
-                    }
-                    else
-                    {
-                        if (IsMonthlySummaryHeader(Cell(row, c))) break;
-                        throw new InvalidDataException($"Invalid monthly date column '{Cell(row, c)}'. Expected a day number.");
-                    }
-                }
+                var dayColumns = FindMonthlyDayColumns(row, nameColumn);
                 if (dayColumns.Count > 0 && tables.SelectMany(rows => rows)
-                    .Any(metric => Same(Cell(metric, nameColumn + 1), LabelCheckIn)
-                        || Same(Cell(metric, nameColumn + 1), LabelCheckOut)))
+                    .Any(metric => IsFirstCheckIn(Cell(metric, nameColumn + 1))
+                        || IsFirstCheckOut(Cell(metric, nameColumn + 1))))
                 {
                     var summaryHeader = rowIndex + 1 < table.Count ? table[rowIndex + 1] : new List<string>();
                     return (row, summaryHeader, dayColumns);
                 }
             }
         return null;
+    }
+
+    private static List<int> FindMonthlyDayColumns(List<string> header, int nameColumn)
+    {
+        var dayColumns = new List<int>();
+        var hasPadding = false;
+        for (var column = nameColumn + 2; column < header.Count; column++)
+        {
+            var value = Cell(header, column);
+            if (IsMonthlySummaryHeader(value)) break;
+            if (int.TryParse(value, out _) && !hasPadding)
+            {
+                dayColumns.Add(column);
+            }
+            else if (NormalizeMetric(value) is null)
+            {
+                hasPadding = true;
+            }
+            else
+            {
+                throw new InvalidDataException($"Invalid monthly date column '{value}'. Expected a day number.");
+            }
+        }
+        return dayColumns;
     }
 
     private static bool LooksLikeMonthlyOverview(List<List<List<string>>> tables) =>
@@ -389,6 +476,8 @@ public static partial class AttendanceParser
         int ixId = FindIndex(header, LabelPersonId);
         int ixName = FindIndex(header, LabelName);
         int labelColumn = ixName + 1;
+        var summaryStart = Enumerable.Range(dayColumns.Max() + 1, header.Count - dayColumns.Max() - 1)
+            .FirstOrDefault(column => IsMonthlySummaryHeader(Cell(header, column)), header.Count);
         int ixAbsent = FindHeader(header, value => NormalizeHeader(value).StartsWith("absent", StringComparison.Ordinal));
         int ixAttended = FindHeader(header, value => NormalizeHeader(value).StartsWith("attendedactual", StringComparison.Ordinal));
         int ixLeave = FindHeader(header, value => Same(value, "Leave"));
@@ -409,18 +498,46 @@ public static partial class AttendanceParser
         var employeeTotals = new Dictionary<(int No, string Id, string Name), MonthlyEmployeeTotals>();
         foreach (var row in rows)
         {
+            if (FindIndex(row, LabelNo) >= 0 && FindIndex(row, LabelPersonId) >= 0 && FindIndex(row, LabelName) >= 0
+                && row.Skip(labelColumn + 1).Any(value => int.TryParse(value, out _)))
+            {
+                var repeatedColumns = FindMonthlyDayColumns(row, FindIndex(row, LabelName));
+                if (!repeatedColumns.SequenceEqual(dayColumns)
+                    || dayColumns.Any(column => int.Parse(Cell(row, column), CultureInfo.InvariantCulture)
+                        != int.Parse(Cell(header, column), CultureInfo.InvariantCulture))
+                    || FindIndex(row, LabelNo) != ixNo || FindIndex(row, LabelPersonId) != ixId || FindIndex(row, LabelName) != ixName
+                    || Enumerable.Range(summaryStart, Math.Max(0, header.Count - summaryStart))
+                        .Any(column => !Same(Cell(row, column), Cell(header, column))))
+                    throw new InvalidDataException("The monthly report contains conflicting date or summary headers. Export one consistent report range again.");
+                continue;
+            }
             var label = Cell(row, labelColumn);
-            var isCheckIn = Same(label, LabelCheckIn);
-            var isCheckOut = Same(label, LabelCheckOut);
+            if (IsAdditionalPunch(label))
+            {
+                if (row.Skip(labelColumn + 1).Take(Math.Max(0, summaryStart - labelColumn - 1))
+                    .Any(value => !IsEmptyMetricPadding(value))
+                    || row.Skip(header.Count).Any(value => !IsEmptyMetricPadding(value)))
+                    throw AdditionalPunchError(Cell(row, ixId), Cell(row, ixName));
+                continue;
+            }
+            var isCheckIn = IsFirstCheckIn(label);
+            var isCheckOut = IsFirstCheckOut(label);
             var isAttended = Same(label, LabelAttended);
             var isOvertime = IsOvertimeLabel(label);
             var isStatus = Same(label, LabelStatus);
             if (!isCheckIn && !isCheckOut && !isAttended && !isOvertime && !isStatus) continue;
-            if (!int.TryParse(Cell(row, ixNo), out var no)) continue;
+            if (!int.TryParse(Cell(row, ixNo), out var no))
+                throw new InvalidDataException($"The monthly '{label}' row for employee '{Cell(row, ixId)}' has an invalid or missing row number.");
             if (row.Count <= dayColumns.Max())
                 throw new InvalidDataException($"The monthly '{label}' row for employee '{Cell(row, ixId)}' is incomplete.");
+            if (row.Skip(dayColumns.Max() + 1).Take(Math.Max(0, summaryStart - dayColumns.Max() - 1))
+                .Any(value => !IsEmptyMetricPadding(value)))
+                throw new InvalidDataException($"The monthly '{label}' row for employee '{Cell(row, ixId)}' contains data without a date column.");
+            if (row.Skip(header.Count).Any(value => !IsEmptyMetricPadding(value)))
+                throw new InvalidDataException($"The monthly '{label}' row for employee '{Cell(row, ixId)}' contains data without a date column.");
 
             var key = (No: no, Id: Cell(row, ixId), Name: Cell(row, ixName));
+            ValidateIdentity(key.Id, key.Name);
             if (!blocks.TryGetValue(key, out var metrics))
             {
                 metrics = new Dictionary<string, Dictionary<int, string>>();
@@ -428,9 +545,9 @@ public static partial class AttendanceParser
             }
             if (isCheckIn)
             {
-                decimal? absentDays = ReadDecimal(row, ixAbsent);
-                decimal? attendedDays = ReadDecimal(row, ixAttended);
-                decimal? leaveDays = SumDecimalCells(row, leaveColumns);
+                decimal? absentDays = ReadDecimal(row, ixAbsent, "Absent", key.Id, key.Name);
+                decimal? attendedDays = ReadDecimal(row, ixAttended, "Attended(Actual)", key.Id, key.Name);
+                decimal? leaveDays = SumDecimalCells(row, leaveColumns, key.Id, key.Name);
                 if (absentDays is not null || attendedDays is not null || leaveDays is not null)
                 {
                     var totals = new MonthlyEmployeeTotals(Cell(row, ixId), Cell(row, ixName), no,
@@ -441,7 +558,11 @@ public static partial class AttendanceParser
                 }
             }
             var values = new Dictionary<int, string>();
-            foreach (var col in dayColumns) values[col] = Cell(row, col);
+            foreach (var col in dayColumns)
+            {
+                ValidateMetricValue(label, Cell(row, col), key.Id, key.Name, datesByColumn[col]);
+                values[col] = Cell(row, col);
+            }
             var metricName = isCheckIn ? LabelCheckIn
                 : isCheckOut ? LabelCheckOut
                 : isAttended ? LabelAttended
@@ -472,11 +593,35 @@ public static partial class AttendanceParser
                 overtime.TryGetValue(col, out var otHours);
                 statuses.TryGetValue(col, out var status);
                 records.Add(new AttendanceRecord(id, name, TemplateSpec.UnknownGender, date,
-                    NormalizePunch(tin), NormalizePunch(tout), Order: key.No,
-                    Attended: NormalizeMetric(totalHours), Overtime: NormalizeMetric(otHours), Status: NormalizeMetric(status)));
+                    ReadPunch(tin, id, name, date, LabelCheckIn), ReadPunch(tout, id, name, date, LabelCheckOut), Order: key.No,
+                    Attended: ReadHours(totalHours, id, name, date, LabelAttended),
+                    Overtime: ReadHours(otHours, id, name, date, LabelOvertime), Status: NormalizeMetric(status)));
             }
         }
-        return (records, employeeTotals.Values.OrderBy(total => total.Order).ToList());
+        var uniqueTotals = new List<MonthlyEmployeeTotals>();
+        foreach (var employee in employeeTotals.Values.GroupBy(total => (total.Id, total.Name)))
+        {
+            var orderedTotals = employee.OrderBy(value => value.Order).ToArray();
+            var total = orderedTotals[0];
+            foreach (var repeated in orderedTotals.Skip(1))
+            {
+                total = total with
+                {
+                    AbsentDays = Merge(total.AbsentDays, repeated.AbsentDays),
+                    AttendedDays = Merge(total.AttendedDays, repeated.AttendedDays),
+                    LeaveDays = Merge(total.LeaveDays, repeated.LeaveDays),
+                };
+            }
+            uniqueTotals.Add(total);
+
+            decimal? Merge(decimal? first, decimal? other)
+            {
+                if (first is not null && other is not null && first != other)
+                    throw new InvalidDataException($"Conflicting monthly summary totals for employee '{total.Id}' ({total.Name}).");
+                return first ?? other;
+            }
+        }
+        return (records, uniqueTotals.OrderBy(total => total.Order).ToList());
     }
 
     private static int FindHeader(List<string> header, Func<string, bool> match) =>
@@ -485,25 +630,33 @@ public static partial class AttendanceParser
     private static string NormalizeHeader(string value) =>
         new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
-    private static decimal? ReadDecimal(List<string> row, int index)
+    private static decimal? ReadDecimal(List<string> row, int index, string label, string id, string name)
     {
-        var value = Cell(row, index).Trim();
-        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number)
-            ? number
-            : null;
+        var value = NormalizeMetric(Cell(row, index));
+        if (value is null) return null;
+        if (decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out var number) && number >= 0) return number;
+        throw new InvalidDataException($"Invalid monthly '{label}' summary total '{value}' for employee '{id}' ({name}). "
+            + "Use a nonnegative number with a decimal point, such as 1.5.");
     }
 
-    private static decimal? SumDecimalCells(List<string> row, IReadOnlyList<int> columns)
+    private static decimal? SumDecimalCells(List<string> row, IReadOnlyList<int> columns, string id, string name)
     {
         if (columns.Count == 0) return null;
         decimal total = 0;
         var foundValue = false;
         foreach (var column in columns)
         {
-            var value = Cell(row, column).Trim();
-            if (value.Length == 0 || value == "-") continue;
-            if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number)) continue;
-            total += number;
+            var number = ReadDecimal(row, column, "Leave", id, name);
+            if (number is null) continue;
+            try
+            {
+                total += number.Value;
+            }
+            catch (OverflowException exception)
+            {
+                throw new InvalidDataException($"The monthly Leave summary total for employee '{id}' ({name}) is too large.", exception);
+            }
             foundValue = true;
         }
         return foundValue ? total : null;
@@ -517,7 +670,7 @@ public static partial class AttendanceParser
     /// never legally follow &lt;/tr&gt; directly, so re-insert the implied row.
     /// </summary>
     private static string NormalizeHtml(string html) =>
-        Regex.Replace(html, @"</tr>(\s*)<t([dh])", "</tr>$1<tr><t$2", RegexOptions.IgnoreCase);
+        Regex.Replace(html, @"</tr>((?:\s|<!--[\s\S]*?-->)*)<t([dh])", "</tr>$1<tr><t$2", RegexOptions.IgnoreCase);
 
     private static List<List<string>> ExtractRows(HtmlNode table)
     {
@@ -545,7 +698,7 @@ public static partial class AttendanceParser
             {
                 while (row.ContainsKey(column)) column++;
                 // \u00A0 (from &nbsp;) would otherwise survive Trim() and break label matching
-                var text = System.Net.WebUtility.HtmlDecode(td.InnerText).Replace('\u00A0', ' ').Trim();
+                var text = CellText(td);
                 var colspan = SpanOf(td, "colspan");
                 var rowspan = SpanOf(td, "rowspan");
                 for (var k = 0; k < colspan; k++, column++)
@@ -560,6 +713,32 @@ public static partial class AttendanceParser
                 .ToList());
         }
         return rows;
+    }
+
+    private static string CellText(HtmlNode cell)
+    {
+        var text = new StringBuilder();
+        Append(cell);
+        return System.Net.WebUtility.HtmlDecode(text.ToString()).Replace('\u00A0', ' ').Trim();
+
+        void Append(HtmlNode node)
+        {
+            if (node.NodeType == HtmlNodeType.Text)
+            {
+                text.Append(node.InnerText);
+                return;
+            }
+            if (node.NodeType == HtmlNodeType.Comment || node.Name.Equals("script", StringComparison.OrdinalIgnoreCase)
+                || node.Name.Equals("style", StringComparison.OrdinalIgnoreCase)) return;
+            // Nested tables are extracted independently; their cells must not also become parent-cell metadata.
+            if (node.Name.Equals("table", StringComparison.OrdinalIgnoreCase)) return;
+            var separatesText = node.Name.Equals("br", StringComparison.OrdinalIgnoreCase)
+                || node.Name.Equals("p", StringComparison.OrdinalIgnoreCase)
+                || node.Name.Equals("div", StringComparison.OrdinalIgnoreCase);
+            if (separatesText) text.Append(' ');
+            foreach (var child in node.ChildNodes) Append(child);
+            if (separatesText && !node.Name.Equals("br", StringComparison.OrdinalIgnoreCase)) text.Append(' ');
+        }
     }
 
     /// <summary>Reads a colspan/rowspan attribute defensively: the export writes values like "1," and "4;".</summary>
@@ -578,10 +757,69 @@ public static partial class AttendanceParser
     private static bool IsOvertimeLabel(string value) =>
         Same(value, LabelOvertime) || Same(value, "Overtime") || Same(value, "Over Time");
 
-    private static bool MetricValuesEqual(string label, string left, string right) =>
-        Same(label, LabelCheckIn) || Same(label, LabelCheckOut)
-            ? NormalizePunch(left) == NormalizePunch(right)
-            : NormalizeMetric(left) == NormalizeMetric(right);
+    private static bool IsFirstCheckIn(string value) => Same(value, "Check-in")
+        || Regex.IsMatch(value.Trim(), @"^Check-in\s*1$", RegexOptions.IgnoreCase);
+    private static bool IsFirstCheckOut(string value) => Same(value, "Check-out")
+        || Regex.IsMatch(value.Trim(), @"^Check-out\s*1$", RegexOptions.IgnoreCase);
+
+    private static bool IsAdditionalPunch(string value) =>
+        Regex.Match(value.Trim(), @"^Check-(?:in|out)\s*(?<pair>\d+)$", RegexOptions.IgnoreCase) is { Success: true } match
+        && int.TryParse(match.Groups["pair"].Value, out var pair) && pair > 1;
+
+    private static InvalidDataException AdditionalPunchError(string id, string name, DateOnly? date = null) =>
+        new($"The report contains additional Check-in/Check-out punch pairs for employee '{id}' ({name})"
+            + (date is { } day ? $" on {day:dd-MM-yyyy}" : "")
+            + ". Multiple shifts per day are not supported. Export a report with one punch pair per employee and date.");
+
+    private static bool IsMetricLabel(string value) =>
+        IsFirstCheckIn(value) || IsFirstCheckOut(value) || Same(value, LabelAttended)
+        || IsOvertimeLabel(value) || Same(value, LabelStatus);
+
+    private static void ValidateIdentity(string id, string name)
+    {
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name))
+            throw new InvalidDataException("The attendance report has a row without a Person ID or employee Name.");
+    }
+
+    private static bool IsEmptyMetricPadding(string value) =>
+        NormalizeMetric(value) is not { } metric
+        || decimal.TryParse(metric, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out var number) && number == 0;
+
+    private static void ValidateMetricValue(string label, string value, string id, string name, DateOnly date)
+    {
+        if (IsFirstCheckIn(label) || IsFirstCheckOut(label))
+            ReadPunch(value, id, name, date, label);
+        else if (Same(label, LabelAttended) || IsOvertimeLabel(label))
+            ReadHours(value, id, name, date, label);
+    }
+
+    private static string? ReadPunch(string? value, string id, string name, DateOnly date, string label)
+    {
+        if (TryNormalizePunch(value, out var punch)) return punch;
+        throw new InvalidDataException($"Invalid '{label}' punch '{value}' for employee '{id}' ({name}) on {date:dd-MM-yyyy}. "
+            + "Use a valid time such as 07:30, 07:30:00, or 7:30 AM, or '-' for a missing punch.");
+    }
+
+    private static string? ReadHours(string? value, string id, string name, DateOnly date, string label)
+    {
+        var metric = NormalizeMetric(value);
+        if (metric is null) return null;
+        if (AttendanceTime.TryParseHours(metric, out var hours) && hours is >= 0 and <= 24) return metric;
+        throw new InvalidDataException($"Invalid '{label}' duration '{value}' for employee '{id}' ({name}) on {date:dd-MM-yyyy}. "
+            + "Use hours from 0 to 24, such as 12.5 or 12:30, or '-' for a missing value.");
+    }
+
+    private static bool MetricValuesEqual(string label, string left, string right)
+    {
+        if (IsFirstCheckIn(label) || IsFirstCheckOut(label))
+            return NormalizePunch(left) == NormalizePunch(right);
+        if ((Same(label, LabelAttended) || IsOvertimeLabel(label))
+            && AttendanceTime.TryParseHours(left, out var leftHours)
+            && AttendanceTime.TryParseHours(right, out var rightHours)) return leftHours == rightHours;
+        return string.Equals(NormalizeMetric(left), NormalizeMetric(right),
+            Same(label, LabelStatus) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
 
     private static bool IsMonthlySummaryHeader(string value)
     {
@@ -599,15 +837,22 @@ public static partial class AttendanceParser
 
     private static string? NormalizePunch(string? value)
     {
-        value = value?.Trim();
-        if (string.IsNullOrEmpty(value) || value == "-") return null;
-        if (Regex.IsMatch(value, @"^\d{1,2}:\d{2}:\d{2}$")) value = value[..value.LastIndexOf(':')];
-        if (!Regex.IsMatch(value, @"^\d{1,2}:\d{2}$")) return null;
+        if (TryNormalizePunch(value, out var punch)) return punch;
+        throw new InvalidDataException($"Invalid attendance punch '{value}'.");
+    }
 
-        var hour = int.Parse(value[..value.IndexOf(':')], CultureInfo.InvariantCulture);
-        var minute = int.Parse(value[(value.IndexOf(':') + 1)..], CultureInfo.InvariantCulture);
-        if (hour > 23 || minute > 59) return null; // "24:00" or "06:99" are not real punches
-        return $"{hour:00}:{minute:00}";
+    private static bool TryNormalizePunch(string? value, out string? punch)
+    {
+        value = NormalizeMetric(value);
+        punch = null;
+        if (value is null) return true;
+        value = Regex.Replace(value, @"\s+", " ");
+        if (!TimeOnly.TryParseExact(value,
+            ["H:mm", "HH:mm", "H:mm:ss", "HH:mm:ss", "h:mm tt", "hh:mm tt", "h:mm:ss tt", "hh:mm:ss tt",
+                "h:mmtt", "hh:mmtt", "h:mm:sstt", "hh:mm:sstt"],
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)) return false;
+        punch = time.ToString("HH:mm", CultureInfo.InvariantCulture);
+        return true;
     }
 
     private readonly record struct ReportRange(DateOnly From, DateOnly To);
@@ -615,26 +860,40 @@ public static partial class AttendanceParser
     /// <summary>Reads the declared range from decoded cells, never from metadata or employee joining dates.</summary>
     private static ReportRange ReportRangeOf(List<List<List<string>>> tables)
     {
-        var text = string.Join(" ", tables.SelectMany(table => table).SelectMany(row => row));
-        var match = Regex.Match(text, @"\bFrom\s*:?\s*(?<from>\S+)\s+.*?\bTo\s*:?\s*(?<to>\S+)",
+        // Employee fields can contain arbitrary text, including strings that resemble dates/ranges.
+        // Only report title rows provide the range; employee identity and metric rows are not metadata.
+        var titleRows = tables.SelectMany(table => table).Where(row =>
+            !row.Any(cell => Same(cell, LabelPersonId) || Same(cell, LabelEmployeeName) || Same(cell, LabelNo))
+            && !int.TryParse(Cell(row, 0), out _)
+            && !IsMetricLabel(Cell(row, 0)) && !Same(Cell(row, 0), LabelDate) && !Same(Cell(row, 0), "Summary"));
+        var text = string.Join(" ", titleRows.SelectMany(row => row));
+        var matches = Regex.Matches(text, @"\bFrom\s*:?\s*(?<from>\S+)\s+.*?\bTo\s*:?\s*(?<to>\S+)",
             RegexOptions.IgnoreCase);
-        if (!match.Success)
+        if (matches.Count == 0)
         {
             // Some exports omit the From label but still have an explicit date-to-date title.
-            match = Regex.Match(text,
+            matches = Regex.Matches(text,
                 @"(?<![\d/.-])(?<from>\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\s+To\s*:?\s*(?<to>\S+)",
                 RegexOptions.IgnoreCase);
         }
-        if (!match.Success)
+        if (matches.Count == 0)
             throw new InvalidDataException("Could not find a From/To date range in the report to determine the month.");
 
-        var fromText = match.Groups["from"].Value;
-        var toText = match.Groups["to"].Value;
-        if (!TryParseDate(fromText, out var from) || !TryParseDate(toText, out var to))
-            throw new InvalidDataException($"Invalid report date range '{fromText}' to '{toText}'. Use day-month-year or year-month-day dates.");
-        if (to < from)
-            throw new InvalidDataException($"Invalid report date range: To date {to:dd-MM-yyyy} is before From date {from:dd-MM-yyyy}.");
-        return new ReportRange(from, to);
+        ReportRange? range = null;
+        foreach (Match match in matches)
+        {
+            var fromText = match.Groups["from"].Value;
+            var toText = match.Groups["to"].Value;
+            if (!TryParseDate(fromText, out var from) || !TryParseDate(toText, out var to))
+                throw new InvalidDataException($"Invalid report date range '{fromText}' to '{toText}'. Use day-month-year or year-month-day dates.");
+            if (to < from)
+                throw new InvalidDataException($"Invalid report date range: To date {to:dd-MM-yyyy} is before From date {from:dd-MM-yyyy}.");
+            var current = new ReportRange(from, to);
+            if (range is { } previous && previous != current)
+                throw new InvalidDataException("The monthly report contains conflicting From/To date ranges. Export one consistent report range again.");
+            range = current;
+        }
+        return range!.Value;
     }
 
     private static readonly string[] DateFormats =

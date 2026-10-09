@@ -132,18 +132,18 @@ public class ContentVariationTests
         Assert.Equal("06:51", report.Records[0].InPunch);
     }
 
-    [Fact]
-    public void Impossible_punch_values_are_treated_as_missing()
+    [Theory]
+    [InlineData("24:00")]
+    [InlineData("06:99")]
+    [InlineData("abc")]
+    public void Impossible_punch_values_are_rejected_instead_of_becoming_missing(string invalidPunch)
     {
-        var report = AttendanceParser.Parse(TestReports.DailyFlexible(
-            new TestReports.DailyRow("1", "3", "A", "06-10-2026", "24:00", "19:00"),
-            new TestReports.DailyRow("2", "4", "B", "06-10-2026", "06:99", "19:00"),
-            new TestReports.DailyRow("3", "5", "C", "06-10-2026", "abc", "19:00")));
+        var html = TestReports.DailyFlexible(new TestReports.DailyRow("1", "3", "A", "06-10-2026", invalidPunch, "19:00"));
+        var exception = Assert.Throws<InvalidDataException>(() => AttendanceParser.Parse(html));
 
-        Assert.Null(report.Records[0].InPunch);
-        Assert.Equal("19:00", report.Records[0].OutPunch);
-        Assert.Null(report.Records[1].InPunch);
-        Assert.Null(report.Records[2].InPunch);
+        Assert.Contains(invalidPunch, exception.Message);
+        Assert.Contains("employee '3'", exception.Message);
+        Assert.Contains("06-10-2026", exception.Message);
     }
 
     [Fact]

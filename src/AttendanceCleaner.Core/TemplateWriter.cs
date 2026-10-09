@@ -108,8 +108,7 @@ public static class TemplateWriter
 
     public static void WriteToFile(IEnumerable<AttendanceRecord> records, string path)
     {
-        using var stream = File.Create(path);
-        Write(records, stream);
+        ReportFileWriter.Write(path, stream => Write(records, stream));
     }
 
     private static string Remark(AttendanceRecord record) =>
@@ -123,15 +122,7 @@ public static class TemplateWriter
     /// <summary>Use the export's attended duration consistently before falling back to punches.</summary>
     internal static int? WorkedMinutes(AttendanceRecord record)
     {
-        if (AttendanceTime.TryParseHours(record.Attended, out var hours) && hours > 0)
-        {
-            // Invalid source values must not overflow the integer minute representation.
-            if (hours <= int.MaxValue / 60m)
-            {
-                var reportedMinutes = (int)decimal.Round(hours * 60m, 0, MidpointRounding.AwayFromZero);
-                if (reportedMinutes > 0) return reportedMinutes;
-            }
-        }
+        if (AttendanceTime.TryParseWorkedMinutes(record.Attended, out var minutes)) return minutes;
 
         return AttendanceTime.PunchDurationMinutes(record.InPunch, record.OutPunch);
     }

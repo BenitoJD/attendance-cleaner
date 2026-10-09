@@ -19,7 +19,8 @@ public sealed record MonthlyEmployeeSummary(
     decimal LeaveDays,
     decimal TotalDutyHours,
     decimal TotalOvertimeHours,
-    decimal TotalHours);
+    decimal TotalHours,
+    string? Warning = null);
 
 public sealed record MonthlyWorkbookPreview(IReadOnlyList<MonthlySheetPreview> Sheets);
 
@@ -86,6 +87,7 @@ public static class MonthlyTemplateWriter
             decimal dutyTotal = 0;
             decimal overtimeTotal = 0;
             decimal total = 0;
+            string? warning = null;
 
             foreach (var (date, record) in byDate)
             {
@@ -133,12 +135,26 @@ public static class MonthlyTemplateWriter
                 var creditedHolidays = byDate
                     .Count(day => mandatoryHolidayDates.Contains(day.Key) && !IsPresent(day.Value));
 
-                if (reportedTotals.AttendedDays is { } attendedDays)
-                    present = attendedDays + creditedHolidays;
-                if (reportedTotals.AbsentDays is { } absentDays)
-                    absent = Math.Max(0m, absentDays - unworkedDaysOff - creditedHolidays);
-                if (reportedTotals.LeaveDays is { } leaveDays)
-                    leave = leaveDays + unworkedDaysOff;
+                var countsFitExport = new[] { reportedTotals.AttendedDays, reportedTotals.AbsentDays, reportedTotals.LeaveDays }
+                    .All(count => count is null || count >= 0 && count <= byDate.Count);
+                if (countsFitExport)
+                {
+                    var reportedPresent = reportedTotals.AttendedDays is { } attendedDays
+                        ? attendedDays + creditedHolidays : present;
+                    var reportedAbsent = reportedTotals.AbsentDays is { } absentDays
+                        ? Math.Max(0m, absentDays - unworkedDaysOff - creditedHolidays) : absent;
+                    var reportedLeave = reportedTotals.LeaveDays is { } leaveDays
+                        ? leaveDays + unworkedDaysOff : leave;
+                    if (reportedPresent + reportedAbsent + reportedLeave == byDate.Count)
+                    {
+                        present = reportedPresent;
+                        absent = reportedAbsent;
+                        leave = reportedLeave;
+                    }
+                    else countsFitExport = false;
+                }
+                if (!countsFitExport)
+                    warning = "Source totals inconsistent; counted each exported date once.";
             }
 
             summaries.Add(new MonthlyEmployeeSummary(
@@ -151,7 +167,8 @@ public static class MonthlyTemplateWriter
                 leave,
                 dutyTotal,
                 overtimeTotal,
-                total));
+                total,
+                warning));
         }
         return summaries;
     }
@@ -347,8 +364,11 @@ public static class MonthlyTemplateWriter
             ws.Cell(rowNumber, 3).Value = SpreadsheetValues.EmployeeId(employee.Id);
             ws.Cell(rowNumber, 2).Value = employee.Name;
             ws.Cell(rowNumber, 4).Value = summary.ScheduledWorkdays;
+            var remarks = new List<string>();
             if (byDate.Count < daysInMonth)
-                ws.Cell(rowNumber, remarksColumn).Value = $"Reported dates: {byDate.Count} of {daysInMonth} days";
+                remarks.Add($"Reported dates: {byDate.Count} of {daysInMonth} days");
+            if (summary.Warning is not null) remarks.Add(summary.Warning);
+            ws.Cell(rowNumber, remarksColumn).Value = string.Join("\n", remarks);
 
             for (var day = 1; day <= daysInMonth; day++)
             {
@@ -509,7 +529,12 @@ public static class MonthlyTemplateWriter
         remarks.Style.Alignment.WrapText = true;
         remarks.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
         for (var row = FirstDataRow; row <= lastRow; row++)
-            if (!ws.Cell(row, lastColumn).IsEmpty()) ws.Row(row).Height = Math.Max(34, ws.Row(row).Height);
+        {
+            var text = ws.Cell(row, lastColumn).GetString();
+            if (text.Length == 0) continue;
+            var wrappedLines = text.Split('\n').Sum(line => Math.Max(1, (int)Math.Ceiling(line.Length / 20d)));
+            ws.Row(row).Height = Math.Max(34, wrappedLines * 12);
+        }
 
         if (kind == MonthlyTemplateKind.DutyAndOvertime)
         {
@@ -630,15 +655,14 @@ public static class MonthlyTemplateWriter
     private static decimal GetPunchWindowHours(AttendanceRecord record, TimeOnly fromTime, TimeOnly toTime)
     {
         if (!AttendanceTime.TryParsePunch(record.InPunch, out var inTime) || !AttendanceTime.TryParsePunch(record.OutPunch, out var outTime)) return 0;
-        var date = record.Date.ToDateTime(TimeOnly.MinValue);
-        var start = date.Add(inTime.ToTimeSpan());
-        var end = date.Add(outTime.ToTimeSpan());
-        if (end < start) end = end.AddDays(1);
-        var windowStart = date.Add(fromTime.ToTimeSpan());
-        var windowEnd = date.Add(toTime.ToTimeSpan());
+        var start = inTime.Hour * 60 + inTime.Minute;
+        var end = outTime.Hour * 60 + outTime.Minute;
+        if (end < start) end += 24 * 60;
+        var windowStart = fromTime.Hour * 60 + fromTime.Minute;
+        var windowEnd = toTime.Hour * 60 + toTime.Minute;
         var overlapStart = start > windowStart ? start : windowStart;
         var overlapEnd = end < windowEnd ? end : windowEnd;
-        var overlap = Math.Max(0, (int)(overlapEnd - overlapStart).TotalMinutes);
+        var overlap = Math.Max(0, overlapEnd - overlapStart);
         return overlap / 60m;
     }
 
