@@ -102,6 +102,6 @@ public sealed class EmployeeIdentityTests
         }
         stream.Position = 0;
         var preview = MonthlyTemplateWriter.ReadPreview(stream);
-        Assert.Single(preview.Sheets[0].Cells.Where(cell => cell.Text == "Example Employee"));
+        Assert.Single(preview.Sheets[0].Cells, cell => cell.Text == "Example Employee");
     }
 }
