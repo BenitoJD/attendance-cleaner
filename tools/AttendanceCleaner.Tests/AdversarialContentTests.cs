@@ -103,15 +103,15 @@ public class AdversarialContentTests
     }
 
     [Fact]
-    public void Duplicate_employee_entries_are_all_preserved()
+    public void Conflicting_employee_entries_are_rejected_instead_of_silently_dropped()
     {
-        var rows = TemplateWriter.BuildRows(new[]
+        var error = Assert.Throws<InvalidDataException>(() => TemplateWriter.BuildRows(new[]
         {
             new AttendanceRecord("3", "AJITH.S.S", "", Sep(1), "06:51", "19:00", Order: 0),
             new AttendanceRecord("3", "AJITH.S.S", "", Sep(1), "06:55", "19:02", Order: 1), // same person twice
             new AttendanceRecord("3", "AJITH.S.S", "", Sep(1), null, null, Order: 2),
-        });
-        Assert.Equal(3, rows.Count); // nothing is silently dropped; payroll sees the truth
+        }));
+        Assert.Contains("Conflicting attendance rows", error.Message);
     }
 
     [Fact]

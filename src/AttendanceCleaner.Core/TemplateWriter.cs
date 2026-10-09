@@ -41,7 +41,7 @@ public static class TemplateWriter
     public static IReadOnlyList<TemplateRow> BuildRows(IEnumerable<AttendanceRecord> records)
     {
         var rows = new List<TemplateRow>();
-        foreach (var group in records.GroupBy(r => r.Date).OrderBy(g => g.Key))
+        foreach (var group in DistinctEmployeeDates(records).GroupBy(r => r.Date).OrderBy(g => g.Key))
         {
             var slNo = 1;
             foreach (var record in group.OrderBy(r => r.Order))
@@ -167,11 +167,28 @@ public static class TemplateWriter
         return AttendanceTime.TryParseWorkedMinutes(record.Attended, out var minutes) ? minutes : null;
     }
 
-    /// <summary>Count repeated observations once and refuse contradictory employee/day records.</summary>
+    /// <summary>Use stable employee IDs, reconcile harmless name variations, and count each employee/date once.</summary>
     internal static IReadOnlyList<AttendanceRecord> DistinctEmployeeDates(IEnumerable<AttendanceRecord> records)
     {
+        var namesById = new Dictionary<string, string>(StringComparer.Ordinal);
+        var normalized = new List<AttendanceRecord>();
+        foreach (var record in records)
+        {
+            var name = string.Join(" ", record.Name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (namesById.TryGetValue(record.Id, out var existingName))
+            {
+                if (!string.Equals(existingName, name, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException(
+                        $"Conflicting employee names for ID '{record.Id}': '{existingName}' and '{name}'. "
+                        + "Verify the employee identity in the source report.");
+                name = existingName;
+            }
+            else namesById.Add(record.Id, name);
+            normalized.Add(record with { Name = name });
+        }
+
         var unique = new List<AttendanceRecord>();
-        foreach (var group in records.GroupBy(record => (record.Id, record.Name, record.Date)))
+        foreach (var group in normalized.GroupBy(record => (record.Id, record.Date)))
         {
             var first = group.First();
             if (group.Skip(1).Any(record => !SameAttendance(first, record)))
@@ -185,11 +202,19 @@ public static class TemplateWriter
     }
 
     private static bool SameAttendance(AttendanceRecord first, AttendanceRecord other) =>
-        first.InPunch == other.InPunch
+        SameGender(first.Gender, other.Gender)
+        && first.InPunch == other.InPunch
         && first.OutPunch == other.OutPunch
         && SameMetric(first.Attended, other.Attended)
         && SameMetric(first.Overtime, other.Overtime)
         && string.Equals(first.Status?.Trim(), other.Status?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameGender(string? first, string? other)
+    {
+        static string Normalize(string? value) => string.IsNullOrWhiteSpace(value) || value.Trim() == "-"
+            ? "" : value.Trim();
+        return string.Equals(Normalize(first), Normalize(other), StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool SameMetric(string? first, string? other)
     {

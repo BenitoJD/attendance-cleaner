@@ -99,11 +99,11 @@ public sealed class ReportIntegrityTests
     }
 
     [Fact]
-    public void Repeated_identical_employee_days_count_once_in_summaries_and_preserve_daily_rows()
+    public void Repeated_identical_employee_days_count_once_in_all_reports()
     {
         var record = Record();
         var records = new[] { record, record with { Order = 99 } };
-        Assert.Equal(2, TemplateWriter.BuildRows(records).Count);
+        Assert.Single(TemplateWriter.BuildRows(records));
         var dashboard = AttendanceAnalytics.Build(records);
         Assert.Equal(1, dashboard.TotalRows);
         Assert.Equal(1, dashboard.Present);
@@ -120,7 +120,7 @@ public sealed class ReportIntegrityTests
             new("1", "007", "Example", "01-09-2026", "07:00", "16:00"),
             new("2", "007", "Example", "01-09-2026", "16:00", "19:00")));
         Assert.Equal(2, report.Records.Count);
-        Assert.Equal(2, TemplateWriter.BuildRows(report.Records).Count);
+        AssertDuplicateError(() => TemplateWriter.BuildRows(report.Records));
 
         AssertDuplicateError(() => AttendanceAnalytics.Build(report.Records));
         AssertDuplicateError(() => MonthlyTemplateWriter.BuildSummaries(report.Records, [], Month));

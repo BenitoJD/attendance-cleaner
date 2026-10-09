@@ -51,7 +51,7 @@ The app and CLI share decoding for Unicode BOMs and declared HTML character sets
 
 Daily imports follow labelled columns even when repeated page headers change their order, and preserve overtime and status values. Valid 24-hour punches, seconds, and AM/PM punches are normalized to the template's minute precision. Malformed nonempty punches and durations report the employee, date, and field instead of silently becoming missing attendance. Durations accept decimal hours such as `1.5` or hours/minutes/seconds such as `01:30:00`; ambiguous comma values are rejected. Reported durations round to the nearest minute, with 30 seconds rounding up.
 
-Dashboard and monthly summaries count identical employee/date records once. Conflicting records for the same employee/date produce a clear error instead of discarding a shift or counting two attendance days. The daily writer continues to preserve source rows.
+Daily exports, dashboards and monthly summaries count identical employee/date records once. Conflicting records for the same employee/date produce a clear error instead of discarding a shift or counting two attendance days. Employee IDs determine identity; differences in name casing or spacing share one display name, while different names for one ID require source correction.
 
 Automated calendar regression tests cover every month from **2026 through 2036** (the current year plus ten future years) across all three import formats and both monthly workbook layouts. They check exact dates and punches, month lengths and weekdays, partial exports, skipped days at every month/year boundary, and acceptance or rejection of February 29. This validates the supported export layouts; each year's holidays and working Saturdays still come from the editable calendar.
 
