@@ -493,6 +493,25 @@
             <ScrollView x:Name="DashboardSection" Grid.Row="2" IsVisible="False">
                 <VerticalStackLayout Spacing="12">
 
+                    <Label x:Name="DashScope" FontSize="20" FontAttributes="Bold"
+                           SemanticProperties.HeadingLevel="Level1"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Label x:Name="DashSource" FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    <HorizontalStackLayout x:Name="DashPeriodControls" Spacing="8" IsVisible="False">
+                        <Button x:Name="DashDailyBtn" Text="Daily" Clicked="OnDashboardDailyClicked" />
+                        <Button x:Name="DashMonthlyBtn" Text="Monthly" Clicked="OnDashboardMonthlyClicked" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout x:Name="DashDateControls" Spacing="12" IsVisible="False">
+                        <Label Text="Exported date" VerticalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                        <Picker x:Name="DashDatePicker" Title="Select an exported date" WidthRequest="220"
+                                SelectedIndexChanged="OnDashboardDateChanged"
+                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    </HorizontalStackLayout>
+                    <Label Text="Punch evidence only. No punches does not establish absence or leave. Average hours uses complete pairs."
+                           FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
                     <HorizontalStackLayout Spacing="10">
                         <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                                 StrokeShape="RoundRectangle 16" Padding="16,10">
@@ -508,15 +527,19 @@
                             StrokeShape="RoundRectangle 16" Padding="14">
                         <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
                         <VerticalStackLayout Spacing="8">
-                            <Label Text="Daily attendance" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                            <Label Text="Punch coverage by exported date" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
                             <HorizontalStackLayout Spacing="12">
                                 <HorizontalStackLayout Spacing="4">
                                     <BoxView Color="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="present" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                    <Label Text="complete pairs" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                                 <HorizontalStackLayout Spacing="4">
-                                    <BoxView Color="#FCA5A5" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="absent" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                    <BoxView Color="#94A3B8" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
+                                    <Label Text="no punches" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Spacing="4">
+                                    <BoxView Color="{AppThemeBinding Light={StaticResource WarningLight}, Dark={StaticResource WarningDark}}" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
+                                    <Label Text="incomplete pairs" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                             </HorizontalStackLayout>
                             <ScrollView Orientation="Horizontal" HeightRequest="150">

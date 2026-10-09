@@ -12,6 +12,8 @@ public partial class MainPage : ContentPage
     private readonly HolidayCalendarStore _holidayCalendarStore;
     private FileResult? _selectedFile;
     private Dashboard? _dashboard;
+    private DashboardSelection? _dashboardSelection;
+    private bool _configuringDashboard;
     private IReadOnlyList<TemplateRow>? _convertedRows;
     private MonthlyWorkbookPreview? _monthlyWorkbookPreview;
     private string? _lastOutputPath;
@@ -557,13 +559,13 @@ public partial class MainPage : ContentPage
                 }
 
                 // Validate calculations before asking for a destination or writing a file.
-                var dashboard = AttendanceAnalytics.Build(report.Records);
+                var dashboardSelection = new DashboardSelection(report);
                 var summaries = isMonthlyReport
                     ? MonthlyTemplateWriter.BuildSummaries(report.Records, holidays, dates[0], report.EmployeeTotals)
                     : null;
                 if (summaries?.Any(summary => summary.Warning is not null) == true)
                     monthlyWarning += " Some source day totals overlap or do not match the exported dates. Affected employees are marked in Remarks; each exported date is counted once.";
-                return (report, dates, fileName, monthlyWarning, holidays, dashboard, summaries);
+                return (report, dates, fileName, monthlyWarning, holidays, dashboardSelection, summaries);
             });
 
             // 2. let the user choose where to save it
@@ -625,9 +627,9 @@ public partial class MainPage : ContentPage
             _convertedRows = rows;
             BuildTable(rows);
 
-            _dashboard = parsed.dashboard;
-            _sourceFileName = Path.GetFileName(outputPath);
-            BuildDashboard();
+            _dashboardSelection = parsed.dashboardSelection;
+            _sourceFileName = selectedFile.FileName;
+            ConfigureDashboardSelection();
 
             ShowTableTab();
             ConvertSection.IsVisible = false;
@@ -739,6 +741,8 @@ public partial class MainPage : ContentPage
         ConversionWarningLabel.Text = "";
         ConversionWarningLabel.IsVisible = false;
         _dashboard = null;
+        _dashboardSelection = null;
+        _sourceFileName = "";
         ShowTableTab();
     }
 
@@ -776,10 +780,64 @@ public partial class MainPage : ContentPage
 
     // --- dashboard ---
 
+    private void ConfigureDashboardSelection()
+    {
+        if (_dashboardSelection is null) return;
+        _configuringDashboard = true;
+        try
+        {
+            DashDatePicker.Items.Clear();
+            foreach (var date in _dashboardSelection.AvailableDates)
+                DashDatePicker.Items.Add(date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture));
+            DashDatePicker.SelectedIndex = _dashboardSelection.AvailableDates.Count - 1;
+        }
+        finally
+        {
+            _configuringDashboard = false;
+        }
+        BuildDashboard();
+    }
+
+    private void OnDashboardDailyClicked(object? sender, EventArgs e)
+    {
+        if (_dashboardSelection is null) return;
+        _dashboardSelection.SelectPeriod(DashboardPeriod.Daily);
+        BuildDashboard();
+    }
+
+    private void OnDashboardMonthlyClicked(object? sender, EventArgs e)
+    {
+        if (_dashboardSelection?.SupportsMonthly != true) return;
+        _dashboardSelection.SelectPeriod(DashboardPeriod.Monthly);
+        BuildDashboard();
+    }
+
+    private void OnDashboardDateChanged(object? sender, EventArgs e)
+    {
+        if (_configuringDashboard || _dashboardSelection is null || DashDatePicker.SelectedIndex < 0) return;
+        _dashboardSelection.SelectDate(_dashboardSelection.AvailableDates[DashDatePicker.SelectedIndex]);
+        BuildDashboard();
+    }
+
     private void BuildDashboard()
     {
-        if (_dashboard is null) return;
+        if (_dashboardSelection is null) return;
+        _dashboard = _dashboardSelection.Current;
         var d = _dashboard;
+
+        var daily = _dashboardSelection.Period == DashboardPeriod.Daily;
+        DashPeriodControls.IsVisible = _dashboardSelection.SupportsMonthly;
+        DashDateControls.IsVisible = _dashboardSelection.SupportsMonthly && daily;
+        DashScope.Text = daily
+            ? $"Daily dashboard · {d.From:dd MMM yyyy}"
+            : $"Monthly dashboard · {d.From:MMMM yyyy} · {d.Days.Count} exported dates";
+        DashSource.Text = $"Source: {_sourceFileName}";
+        foreach (var button in new[] { DashDailyBtn, DashMonthlyBtn })
+        {
+            var selected = (button == DashDailyBtn) == daily;
+            SetThemeColor(button, Button.BackgroundColorProperty, selected ? "ActionLight" : "SurfaceLight", selected ? "ActionDark" : "SurfaceDark");
+            SetThemeColor(button, Button.TextColorProperty, selected ? "ActionTextLight" : "TextBodyLight", selected ? "ActionTextDark" : "TextBodyDark");
+        }
 
         DashEmployees.Text = $"{d.EmployeeCount}";
         DashStatus.Text = "";
@@ -791,11 +849,11 @@ public partial class MainPage : ContentPage
     private void BuildChart(Dashboard d)
     {
         var grid = new Grid { VerticalOptions = LayoutOptions.End };
-        var max = Math.Max(1, d.Days.Max(x => x.Present + x.Absent));
+        var max = Math.Max(1, d.Days.Max(x => x.Present + x.Absent + x.InPunchOnly));
 
         foreach (var day in d.Days)
         {
-            grid.ColumnDefinitions.Add(new ColumnDefinition(18));
+            grid.ColumnDefinitions.Add(new ColumnDefinition(55));
             var column = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 0 };
             var presentBar = new BoxView
             {
@@ -805,11 +863,22 @@ public partial class MainPage : ContentPage
             };
             SetThemeColor(presentBar, BoxView.ColorProperty, "SuccessLight", "SuccessDark");
             column.Add(presentBar);
+            if (day.InPunchOnly > 0)
+            {
+                var incompleteBar = new BoxView
+                {
+                    HeightRequest = 100.0 * day.InPunchOnly / max,
+                    WidthRequest = 14,
+                    HorizontalOptions = LayoutOptions.Center,
+                };
+                SetThemeColor(incompleteBar, BoxView.ColorProperty, "WarningLight", "WarningDark");
+                column.Add(incompleteBar);
+            }
             if (day.Absent > 0)
             {
                 column.Add(new BoxView
                 {
-                    Color = Color.FromArgb("#FCA5A5"),
+                    Color = Color.FromArgb("#94A3B8"),
                     HeightRequest = 100.0 * day.Absent / max,
                     WidthRequest = 14,
                     HorizontalOptions = LayoutOptions.Center,
@@ -817,8 +886,8 @@ public partial class MainPage : ContentPage
             }
             var dayLabel = new Label
             {
-                Text = day.Date.Day.ToString(CultureInfo.InvariantCulture),
-                FontSize = 8,
+                Text = day.Date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                FontSize = 11,
                 HorizontalTextAlignment = TextAlignment.Center,
                 Padding = new Thickness(0, 3, 0, 0),
             };
@@ -833,7 +902,7 @@ public partial class MainPage : ContentPage
 
     private void BuildEmployeeTable(Dashboard d)
     {
-        var headers = new[] { "ID", "Name", "Present", "Absent", "In only", "Avg in", "Avg out", "Avg hrs", "Rate" };
+        var headers = new[] { "ID", "Name", "Complete pairs", "No punches", "Incomplete", "Avg in", "Avg out", "Avg hrs", "Completeness" };
         string[] Row(EmployeeSummary e) => new[]
         {
             e.Id, e.Name,
@@ -899,14 +968,17 @@ public partial class MainPage : ContentPage
         if (_dashboard is null) return;
         var dashboard = _dashboard;
         var sourceFileName = _sourceFileName;
+        var period = _dashboardSelection?.Period ?? DashboardPeriod.Daily;
 
         SavePdfBtn.IsEnabled = false;
         DashStatus.Text = "Preparing PDF...";
 
         try
         {
-            var suggested = $"Attendance Dashboard {dashboard.From:MMMM yyyy}.pdf";
-            var bytes = await Task.Run(() => DashboardPdf.Build(dashboard, sourceFileName));
+            var suggested = period == DashboardPeriod.Daily
+                ? $"Daily Attendance Dashboard {dashboard.From:yyyy-MM-dd}.pdf"
+                : $"Monthly Attendance Dashboard {dashboard.From:yyyy-MM}.pdf";
+            var bytes = await Task.Run(() => DashboardPdf.Build(dashboard, sourceFileName, period));
 
             var outputPath = await AskForSaveLocationAsync(suggested, ".pdf");
             if (outputPath is null)

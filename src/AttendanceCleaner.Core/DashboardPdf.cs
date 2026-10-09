@@ -12,7 +12,7 @@ namespace AttendanceCleaner.Core;
 /// </summary>
 public static class DashboardPdf
 {
-    public static byte[] Build(Dashboard d, string sourceFileName)
+    public static byte[] Build(Dashboard d, string sourceFileName, DashboardPeriod? period = null)
     {
         QuestPDF.Settings.License = LicenseType.Community;
         PdfFonts.EnsureRegistered();
@@ -27,10 +27,14 @@ public static class DashboardPdf
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text("Attendance Dashboard").FontSize(20).Bold().FontColor("#059669");
+                    col.Item().Text(period is null ? "Attendance Dashboard" : $"{period} Attendance Dashboard")
+                        .FontSize(20).Bold().FontColor("#059669");
+                    col.Item().Text(MonthlyTemplateSpec.CompanyName.TrimEnd('/')).FontSize(10).Bold();
                     col.Item().Text($"{d.EmployeeCount} employees · {d.From.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)} to {d.To.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}")
                         .FontSize(10).FontColor("#6B7280");
                     col.Item().Text($"Source: {sourceFileName}").FontSize(8).FontColor("#9CA3AF");
+                    col.Item().Text("Punch evidence only. No punches does not establish absence or leave. Average hours uses complete pairs.")
+                        .FontSize(8).FontColor("#6B7280");
                 });
 
                 page.Content().PaddingVertical(8).Column(col =>
@@ -41,11 +45,11 @@ public static class DashboardPdf
                     col.Item().Row(row =>
                     {
                         row.RelativeItem().Kpi("Rows", d.TotalRows.ToString(CultureInfo.InvariantCulture), "#111827");
-                        row.RelativeItem().Kpi("Present", $"{d.PresentRate:0.0}% ({d.Present})", "#059669");
-                        row.RelativeItem().Kpi("Absent", $"{d.AbsentRate:0.0}% ({d.Absent})", "#DC2626");
+                        row.RelativeItem().Kpi("Complete pairs", $"{d.PresentRate:0.0}% ({d.Present})", "#059669");
+                        row.RelativeItem().Kpi("No punches", $"{d.AbsentRate:0.0}% ({d.Absent})", "#6B7280");
                         if (d.InPunchOnly > 0)
                         {
-                            row.RelativeItem().Kpi("In punch only", $"{d.InPunchOnly}", "#D97706");
+                            row.RelativeItem().Kpi("Incomplete pairs", $"{d.InPunchOnly}", "#D97706");
                         }
                         row.RelativeItem().Kpi("Avg in", d.AverageIn ?? "-", "#111827");
                         row.RelativeItem().Kpi("Avg out", d.AverageOut ?? "-", "#111827");
@@ -57,23 +61,25 @@ public static class DashboardPdf
                     {
                         col.Item().ShowEntire().Border(1).BorderColor("#E2E8F0").Padding(10).Column(chartCol =>
                         {
-                            chartCol.Item().Text($"Daily attendance · {days[0].Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}"
+                            chartCol.Item().Text($"Punch coverage · {days[0].Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}"
                                 + $" to {days[^1].Date.ToString(TemplateSpec.DateFormat, CultureInfo.InvariantCulture)}")
                                 .Bold().FontSize(11);
-                            var max = Math.Max(1, days.Max(day => day.Present + day.Absent));
-                            chartCol.Item().PaddingTop(6).Height(110).Row(bars =>
+                            var max = Math.Max(1, days.Max(day => day.Present + day.Absent + day.InPunchOnly));
+                            chartCol.Item().PaddingTop(6).Height(130).Row(bars =>
                             {
                                 foreach (var day in days)
                                 {
                                     bars.RelativeItem().AlignBottom().Column(barCol =>
                                     {
-                                        barCol.Item().Height((float)(90.0 * day.Present / max))
+                                        barCol.Item().AlignCenter().Width(14).Height((float)(90.0 * day.Present / max))
                                             .Background("#059669").PaddingHorizontal(1);
-                                        barCol.Item().Height((float)(90.0 * day.Absent / max))
-                                            .Background("#FCA5A5").PaddingHorizontal(1);
+                                        barCol.Item().AlignCenter().Width(14).Height((float)(90.0 * day.InPunchOnly / max))
+                                            .Background("#D97706").PaddingHorizontal(1);
+                                        barCol.Item().AlignCenter().Width(14).Height((float)(90.0 * day.Absent / max))
+                                            .Background("#94A3B8").PaddingHorizontal(1);
                                         barCol.Item().PaddingTop(2).AlignCenter()
                                             .Text(day.Date.ToString("dd MMM", CultureInfo.InvariantCulture))
-                                            .FontSize(6).FontColor("#6B7280");
+                                            .FontSize(8).FontColor("#6B7280");
                                     });
                                 }
                             });
@@ -81,11 +87,15 @@ public static class DashboardPdf
                             {
                                 legend.ConstantItem(10).Height(8).Background("#059669");
                                 legend.ConstantItem(4);
-                                legend.AutoItem().Text("present").FontSize(7).FontColor("#6B7280");
+                                legend.AutoItem().Text("complete pairs").FontSize(7).FontColor("#6B7280");
                                 legend.ConstantItem(10);
-                                legend.ConstantItem(10).Height(8).Background("#FCA5A5");
+                                legend.ConstantItem(10).Height(8).Background("#94A3B8");
                                 legend.ConstantItem(4);
-                                legend.AutoItem().Text("absent").FontSize(7).FontColor("#6B7280");
+                                legend.AutoItem().Text("no punches").FontSize(7).FontColor("#6B7280");
+                                legend.ConstantItem(10);
+                                legend.ConstantItem(10).Height(8).Background("#D97706");
+                                legend.ConstantItem(4);
+                                legend.AutoItem().Text("incomplete pairs").FontSize(7).FontColor("#6B7280");
                             });
                         });
                     }
@@ -123,13 +133,13 @@ public static class DashboardPdf
                             h.Cell().Element(c => Cell(c, "Sl.No", header: true));
                             h.Cell().Element(c => Cell(c, "ID", header: true));
                             h.Cell().Element(c => Cell(c, "Name", header: true));
-                            h.Cell().Element(c => Cell(c, "Present", header: true));
-                            h.Cell().Element(c => Cell(c, "Absent", header: true));
-                            h.Cell().Element(c => Cell(c, "In only", header: true));
+                            h.Cell().Element(c => Cell(c, "Complete", header: true));
+                            h.Cell().Element(c => Cell(c, "No punch", header: true));
+                            h.Cell().Element(c => Cell(c, "Incomplete", header: true));
                             h.Cell().Element(c => Cell(c, "Avg in", header: true));
                             h.Cell().Element(c => Cell(c, "Avg out", header: true));
                             h.Cell().Element(c => Cell(c, "Avg hrs", header: true));
-                            h.Cell().Element(c => Cell(c, "Rate", header: true));
+                            h.Cell().Element(c => Cell(c, "Pair rate", header: true));
                         });
 
                         foreach (var (e, i) in d.Employees.Select((e, i) => (e, i)))
@@ -138,7 +148,7 @@ public static class DashboardPdf
                             table.Cell().Element(c => Cell(c, e.Id));
                             table.Cell().Element(c => Cell(c, e.Name));
                             table.Cell().Element(c => Cell(c, e.PresentDays.ToString(CultureInfo.InvariantCulture), color: "#059669"));
-                            table.Cell().Element(c => Cell(c, e.AbsentDays.ToString(CultureInfo.InvariantCulture), color: e.AbsentDays > 0 ? "#DC2626" : null));
+                            table.Cell().Element(c => Cell(c, e.AbsentDays.ToString(CultureInfo.InvariantCulture), color: "#6B7280"));
                             table.Cell().Element(c => Cell(c, e.InPunchOnlyDays.ToString(CultureInfo.InvariantCulture), color: e.InPunchOnlyDays > 0 ? "#D97706" : null));
                             table.Cell().Element(c => Cell(c, e.AverageIn ?? "-"));
                             table.Cell().Element(c => Cell(c, e.AverageOut ?? "-"));
@@ -150,7 +160,7 @@ public static class DashboardPdf
 
                 page.Footer().Row(foot =>
                 {
-                    foot.RelativeItem().Text($"Generated {DateTime.Now:dd-MM-yyyy HH:mm} · Attendance Report Studio")
+                    foot.RelativeItem().Text($"Generated {DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5)):dd-MM-yyyy HH:mm} IST · Attendance Report Studio")
                         .FontSize(7).FontColor("#9CA3AF");
                     foot.RelativeItem().AlignRight().Text(text =>
                     {
