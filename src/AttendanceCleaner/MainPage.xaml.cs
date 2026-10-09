@@ -1039,10 +1039,12 @@ public partial class MainPage : ContentPage
                 if (string.IsNullOrEmpty(cell.Text))
                     continue;
 
-                canvas.Font = cell.Bold
+                var font = cell.Bold
                     ? Microsoft.Maui.Graphics.Font.DefaultBold
                     : Microsoft.Maui.Graphics.Font.Default;
-                canvas.FontSize = (float)Math.Clamp(cell.FontSize * 1.05, 9, 16);
+                var fontSize = (float)Math.Clamp(cell.FontSize * 1.05, 9, 16);
+                canvas.Font = font;
+                canvas.FontSize = fontSize;
                 canvas.FontColor = ParseColor(cell.TextColor, "#111111");
                 var horizontal = cell.HorizontalAlignment switch
                 {
@@ -1056,17 +1058,35 @@ public partial class MainPage : ContentPage
                     "Bottom" => Microsoft.Maui.Graphics.VerticalAlignment.Bottom,
                     _ => Microsoft.Maui.Graphics.VerticalAlignment.Center,
                 };
-                canvas.DrawString(cell.Text,
-                    x + 3, y + 1, Math.Max(0, width - 6), Math.Max(0, height - 2), horizontal, vertical);
+                var contentWidth = Math.Max(0, width - 6);
+                var contentHeight = Math.Max(0, height - 2);
+                var textX = x + 3;
+                var textWidth = contentWidth;
+                if (!cell.WrapText)
+                {
+                    var longestLine = cell.Text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n')
+                        .Max(line => canvas.GetStringSize(line, font, fontSize).Width);
+                    textWidth = Math.Max(contentWidth, longestLine + fontSize);
+                    textX += horizontal switch
+                    {
+                        Microsoft.Maui.Graphics.HorizontalAlignment.Center => (contentWidth - textWidth) / 2,
+                        Microsoft.Maui.Graphics.HorizontalAlignment.Right => contentWidth - textWidth,
+                        _ => 0,
+                    };
+                }
+                canvas.SaveState();
+                canvas.ClipRectangle(x + 3, y + 1, contentWidth, contentHeight);
+                canvas.DrawString(cell.Text, textX, y + 1, textWidth, contentHeight, horizontal, vertical);
+                canvas.RestoreState();
             }
             canvas.RestoreState();
         }
 
         private static float ToDeviceColumnWidth(double excelWidth) =>
-            (float)Math.Clamp(excelWidth * 7.1, 38, 190);
+            (float)Math.Max(excelWidth * 7.1, 38);
 
         private static float ToDeviceRowHeight(double excelHeight) =>
-            (float)Math.Clamp(excelHeight * 1.35, 22, 120);
+            (float)Math.Max(excelHeight * 1.35, 22);
 
         private static Microsoft.Maui.Graphics.Color ParseColor(string? color, string fallback) =>
             Microsoft.Maui.Graphics.Color.FromArgb(string.IsNullOrWhiteSpace(color) ? fallback : color);

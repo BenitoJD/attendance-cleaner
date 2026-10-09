@@ -589,16 +589,81 @@ public static class MonthlyTemplateWriter
         title.Style.Font.Bold = true;
         title.Style.Font.FontSize = 15;
         title.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        title.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        ws.Row(1).Height = 30;
         var header = ws.Range(3, 1, 3, 3);
         header.Style.Fill.BackgroundColor = XLColor.FromHtml("#0F766E");
         header.Style.Font.FontColor = XLColor.White;
         header.Style.Font.Bold = true;
+        header.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        ws.Row(3).Height = 24;
         var lastRow = Math.Max(3, entries.Count + 3);
         ws.Range(3, 1, lastRow, 3).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         ws.Range(3, 1, lastRow, 3).Style.Border.InsideBorder = XLBorderStyleValues.Hair;
         ws.Column(1).Width = 16;
         ws.Column(2).Width = 36;
         ws.Column(3).Width = 34;
+        if (entries.Count > 0)
+        {
+            var details = ws.Range(4, 1, lastRow, 3);
+            details.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Range(4, 2, lastRow, 3).Style.Alignment.WrapText = true;
+            var graphics = ClosedXML.Graphics.DefaultGraphicEngine.Instance.Value;
+            var digitWidth = graphics.GetMaxDigitWidth(ws.Workbook.Style.Font, 96);
+            for (var row = 4; row <= lastRow; row++)
+            {
+                var height = 24d;
+                for (var column = 2; column <= 3; column++)
+                {
+                    var cell = ws.Cell(row, column);
+                    // Excel does not auto-size wrapped rows when opening a generated workbook.
+                    // Measure the preserved text at the stored width, including spaces and newlines.
+                    var availableWidth = Math.Max(1, ws.Column(column).Width * digitWidth - 10);
+                    var lineCount = 0;
+                    foreach (var paragraph in cell.GetString().Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+                    {
+                        var lineWidth = 0d;
+                        lineCount++;
+                        foreach (System.Text.RegularExpressions.Match token in
+                            System.Text.RegularExpressions.Regex.Matches(paragraph, @"\s+|\S+"))
+                        {
+                            var word = token.Value;
+                            var whitespace = char.IsWhiteSpace(word[0]);
+                            var wordWidth = whitespace ? 0 : graphics.GetTextWidth(word, cell.Style.Font, 96);
+                            if (!whitespace && lineWidth > 0 && lineWidth + wordWidth > availableWidth)
+                            {
+                                lineCount++;
+                                lineWidth = 0;
+                            }
+                            if (!whitespace && wordWidth <= availableWidth)
+                            {
+                                lineWidth += wordWidth;
+                                continue;
+                            }
+
+                            // Wrap whitespace runs and long words without splitting Unicode text elements.
+                            var elements = StringInfo.GetTextElementEnumerator(word);
+                            while (elements.MoveNext())
+                            {
+                                var element = elements.GetTextElement();
+                                var elementWidth = graphics.GetTextWidth(element == "\t" ? "        " : element,
+                                    cell.Style.Font, 96);
+                                if (lineWidth > 0 && lineWidth + elementWidth > availableWidth)
+                                {
+                                    lineCount++;
+                                    lineWidth = 0;
+                                }
+                                lineWidth += elementWidth;
+                            }
+                        }
+                    }
+                    var lineHeight = Math.Max(cell.Style.Font.FontSize * 1.35,
+                        graphics.GetTextHeight(cell.Style.Font, 96) * 72 / 96);
+                    height = Math.Max(height, lineCount * lineHeight + 8);
+                }
+                ws.Row(row).Height = Math.Min(409.5, Math.Ceiling(height));
+            }
+        }
         ws.Range(3, 1, lastRow, 3).SetAutoFilter();
         ws.SheetView.FreezeRows(3);
     }
