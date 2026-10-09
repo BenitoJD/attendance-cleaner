@@ -37,6 +37,8 @@ The `Sep Monthly Over View Report` contains attendance statuses but no punch tim
 
 The importer handles every calendar month, including 28/29-day February and 30/31-day months, using the dates inside the export. Numeric dates use **day-month-year** (with `-`, `/`, or `.`), or ISO **year-month-day**; single-digit days/months and timestamps are accepted. Monthly dates are checked against the report's declared From/To range. Invalid dates and incomplete attendance rows produce an import error instead of silently dropping data or inventing dates.
 
+Fixed-width monthly block exports can pad unused date slots with blanks or `-` (for example, the 31st slot in September). These trailing slots are ignored only when their attendance values are also empty or zero. Padding between numbered date columns and attendance data without a date still produce an error.
+
 The app and CLI share decoding for Unicode BOMs and declared HTML character sets. Employee identifiers may contain letters or leading zeros. Monthly metric rows can appear before or after Status; conflicting repeated metrics are rejected. Leave totals include only the Leave header's columns.
 
 Dashboard and monthly summaries count identical employee/date records once. Conflicting records for the same employee/date produce a clear error instead of discarding a shift or counting two attendance days. The daily writer continues to preserve source rows.

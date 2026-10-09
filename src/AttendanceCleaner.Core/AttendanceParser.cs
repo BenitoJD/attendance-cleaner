@@ -285,8 +285,10 @@ public static partial class AttendanceParser
                     {
                         days[c] = day;
                     }
-                    else if (!string.IsNullOrWhiteSpace(Cell(row, c))
-                        || row.Skip(c + 1).Any(cell => !string.IsNullOrWhiteSpace(cell)))
+                    // Fixed-width exports pad unused day slots (for example September 31) with '-'.
+                    // Padding is valid only after the final date; ReadMetric rejects data in those slots.
+                    else if (NormalizeMetric(Cell(row, c)) is not null
+                        || row.Skip(c + 1).Any(cell => NormalizeMetric(cell) is not null))
                         throw new InvalidDataException($"Invalid monthly date column '{Cell(row, c)}'. Expected a day number.");
                 }
                 dayByColumn = MapDayColumns(range, days);
