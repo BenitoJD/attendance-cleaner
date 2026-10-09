@@ -824,6 +824,8 @@ public partial class MainPage : ContentPage
         BuildDashboard();
     }
 
+    private void OnDashboardKpiSizeChanged(object? sender, EventArgs e) => DashboardChartViews.ReflowKpis(DashKpis);
+
     private void BuildDashboard()
     {
         if (_dashboardSelection is null) return;
@@ -844,7 +846,9 @@ public partial class MainPage : ContentPage
             SetThemeColor(button, Button.TextColorProperty, selected ? "ActionTextLight" : "TextBodyLight", selected ? "ActionTextDark" : "TextBodyDark");
         }
 
-        DashEmployees.Text = $"{d.EmployeeCount}";
+        DashboardChartViews.BuildKpis(DashKpis, d);
+        DashboardChartViews.BuildCharts(DashVisuals, d, daily);
+        DashCoverageCard.IsVisible = !daily;
         DashStatus.Text = "";
 
         BuildChart(d);

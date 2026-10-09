@@ -56,8 +56,13 @@ public static class DashboardPdf
                         row.RelativeItem().Kpi("Avg hours", d.AverageHours ?? "-", "#111827");
                     });
 
+                    if (d.TotalRows > 0)
+                    {
+                        AddVisualCharts(col, d, period == DashboardPeriod.Daily || d.Days.Count == 1);
+                    }
+
                     // Keep each chart panel intact, and keep daily labels legible for long reports.
-                    foreach (var days in d.Days.OrderBy(day => day.Date).Chunk(31))
+                    foreach (var days in d.Days.Where(_ => d.Days.Count > 1).OrderBy(day => day.Date).Chunk(31))
                     {
                         col.Item().ShowEntire().Border(1).BorderColor("#E2E8F0").Padding(10).Column(chartCol =>
                         {
@@ -172,6 +177,97 @@ public static class DashboardPdf
                 });
             });
         }).GeneratePdf();
+    }
+
+    private static void AddVisualCharts(ColumnDescriptor col, Dashboard d, bool daily)
+    {
+        col.Item().ShowEntire().Row(overview =>
+        {
+            overview.Spacing(12);
+            overview.RelativeItem().Border(1).BorderColor("#E2E8F0").Padding(12).Column(card =>
+            {
+                card.Item().Text("Punch completeness").FontSize(12).Bold();
+                card.Item().Text("Share of exported employee-date records").FontSize(8).FontColor("#64748B");
+                card.Item().PaddingTop(6).Row(row =>
+                {
+                    row.ConstantItem(120).Height(120).Svg(DashboardCharts.CompletenessRingSvg(d));
+                    row.RelativeItem().AlignMiddle().Column(legend =>
+                    {
+                        legend.Spacing(8);
+                        foreach (var (label, count, color) in new[] { ("Complete pairs", d.Present, "#059669"), ("Incomplete pairs", d.InPunchOnly, "#D97706"), ("No punches", d.Absent, "#64748B") })
+                            legend.Item().Text($"{label}: {count} ({100.0 * count / d.TotalRows:0.0}%)").FontSize(9).FontColor(color);
+                    });
+                });
+            });
+            overview.RelativeItem().Border(1).BorderColor("#E2E8F0").Padding(12).Column(card =>
+            {
+                card.Item().Text("Recorded span distribution").FontSize(12).Bold();
+                card.Item().Text("Complete pairs only · breaks are not deducted").FontSize(8).FontColor("#64748B");
+                if (d.Present == 0 || d.DurationBuckets.Count == 0)
+                    card.Item().PaddingTop(30).Text("No complete pairs to calculate recorded spans.").FontColor("#64748B");
+                else
+                {
+                    var max = Math.Max(1, d.DurationBuckets.Max(bucket => bucket.Count));
+                    card.Item().PaddingTop(6).Height(120).Row(bars =>
+                    {
+                        foreach (var bucket in d.DurationBuckets)
+                            bars.RelativeItem().AlignBottom().Column(bar =>
+                            {
+                                bar.Item().AlignCenter().Text(bucket.Count.ToString(CultureInfo.InvariantCulture)).Bold().FontColor("#2563EB");
+                                bar.Item().PaddingTop(4).AlignCenter().Width(28).Height(72f * bucket.Count / max).Background("#2563EB");
+                                bar.Item().PaddingTop(5).AlignCenter().Text(bucket.Label).FontSize(8).FontColor("#64748B");
+                            });
+                    });
+                }
+            });
+        });
+
+        if (!daily && d.Days.Count <= 31)
+            col.Item().ShowEntire().Border(1).BorderColor("#E2E8F0").Padding(12).Column(card =>
+            {
+                card.Item().Text("Average recorded span by date").FontSize(12).Bold();
+                card.Item().Text("Each date averages its complete pairs · hh:mm labels · dash means no data, not zero").FontSize(8).FontColor("#64748B");
+                var max = Math.Max(1, d.Days.Max(day => day.AverageMinutes ?? 0));
+                card.Item().PaddingTop(8).Height(120).Row(bars =>
+                {
+                    foreach (var day in d.Days)
+                        bars.RelativeItem().AlignBottom().Column(bar =>
+                        {
+                            bar.Item().AlignCenter().Text(day.AverageHours ?? "-").FontSize(7).FontColor("#2563EB");
+                            bar.Item().PaddingTop(3).AlignCenter().Width(12).Height(75f * (day.AverageMinutes ?? 0) / max).Background("#2563EB");
+                            bar.Item().PaddingTop(3).AlignCenter().Text(day.Date.ToString("dd\nMMM", CultureInfo.InvariantCulture)).FontSize(7).FontColor("#64748B");
+                        });
+                });
+            });
+
+        col.Item().ShowEntire().Border(1).BorderColor("#E2E8F0").Padding(12).Column(card =>
+        {
+            card.Spacing(5);
+            card.Item().Text(daily ? "Longest recorded spans" : "Longest average recorded spans").FontSize(12).Bold();
+            card.Item().Text("Up to 8 employees · highest spans first · complete pairs only").FontSize(8).FontColor("#64748B");
+            var employees = DashboardCharts.LongestEmployeeSpans(d);
+            var max = Math.Max(1, employees.Select(employee => employee.Minutes).DefaultIfEmpty(0).Max());
+            if (employees.Count == 0)
+                card.Item().Text("No complete pairs to compare.").FontColor("#64748B");
+            foreach (var employee in employees)
+                card.Item().PaddingVertical(2).Row(row =>
+                {
+                    row.RelativeItem().Column(name =>
+                    {
+                        name.Item().Text(employee.Name).FontSize(9).Bold().ClampLines(1);
+                        name.Item().Text($"ID {employee.Id} · {employee.CompletePairs} complete pair(s)").FontSize(7).FontColor("#64748B").ClampLines(1);
+                    });
+                    row.ConstantItem(10);
+                    row.RelativeItem(2).AlignMiddle().Height(9).Background("#E2E8F0").Row(track =>
+                    {
+                        if (employee.Minutes > 0) track.RelativeItem(employee.Minutes).Background("#059669");
+                        if (max > employee.Minutes) track.RelativeItem(max - employee.Minutes);
+                    });
+                    row.ConstantItem(10);
+                    row.ConstantItem(42).AlignMiddle().AlignRight().Text(employee.Duration).Bold().FontColor("#059669");
+                });
+            card.Item().Text("Recorded spans measure time between punches, not productivity or payable hours.").FontSize(8).FontColor("#64748B");
+        });
     }
 }
 

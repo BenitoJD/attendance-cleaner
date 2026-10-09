@@ -13,7 +13,14 @@ public sealed record EmployeeSummary(
     double AttendanceRate);
 
 /// <summary>Attendance counts for one calendar day, for the daily trend chart.</summary>
-public sealed record DayTrend(DateOnly Date, int Present, int Absent, int InPunchOnly);
+public sealed record DayTrend(DateOnly Date, int Present, int Absent, int InPunchOnly)
+{
+    public int? AverageMinutes { get; init; }
+    public string? AverageHours => AverageMinutes is { } minutes ? AttendanceTime.FormatMinutes(minutes) : null;
+}
+
+/// <summary>One band of complete punch-to-punch spans; incomplete records are excluded.</summary>
+public sealed record DurationBucket(string Label, int Count);
 
 /// <summary>Everything the dashboard and the PDF report show, derived from the converted rows.</summary>
 public sealed record Dashboard(
@@ -30,7 +37,10 @@ public sealed record Dashboard(
     string? AverageOut,
     string? AverageHours,
     IReadOnlyList<EmployeeSummary> Employees,
-    IReadOnlyList<DayTrend> Days);
+    IReadOnlyList<DayTrend> Days)
+{
+    public IReadOnlyList<DurationBucket> DurationBuckets { get; init; } = Array.Empty<DurationBucket>();
+}
 
 /// <summary>
 /// Derives dashboard summaries from parsed attendance records. Every figure is computed
@@ -59,7 +69,10 @@ public static class AttendanceAnalytics
                 g.Key,
                 g.Count(r => r.InPunch != null && r.OutPunch != null),
                 g.Count(r => r.InPunch == null && r.OutPunch == null),
-                g.Count(r => (r.InPunch != null) != (r.OutPunch != null))))
+                g.Count(r => (r.InPunch != null) != (r.OutPunch != null)))
+            {
+                AverageMinutes = AverageSpanMinutes(g),
+            })
             .ToList();
 
         var employees = all
@@ -97,7 +110,10 @@ public static class AttendanceAnalytics
             AverageOut: AveragePunch(all, outPunch: true),
             AverageHours: AverageHours(all),
             Employees: employees,
-            Days: days);
+            Days: days)
+        {
+            DurationBuckets = BuildDurationBuckets(all),
+        };
     }
 
     /// <summary>Average punch time as "HH:mm" (over the rows that have that punch), rounded to the minute.</summary>
@@ -142,14 +158,34 @@ public static class AttendanceAnalytics
     }
 
     /// <summary>Average worked hours as "HH:mm" (over fully present rows only).</summary>
-    private static string? AverageHours(IEnumerable<AttendanceRecord> rows)
+    private static string? AverageHours(IEnumerable<AttendanceRecord> rows) =>
+        AverageSpanMinutes(rows) is { } minutes ? AttendanceTime.FormatMinutes(minutes) : null;
+
+    private static int? AverageSpanMinutes(IEnumerable<AttendanceRecord> rows)
     {
         var spans = rows.Where(r => r.InPunch != null && r.OutPunch != null)
             .Select(r => TemplateWriter.WorkedMinutes(r)
                 ?? throw new FormatException("Invalid normalized attendance punches."))
             .ToList();
         if (spans.Count == 0) return null;
-        var avg = (int)Math.Round(spans.Average());
-        return AttendanceTime.FormatMinutes(avg);
+        return (int)Math.Round(spans.Average());
+    }
+
+    private static IReadOnlyList<DurationBucket> BuildDurationBuckets(IEnumerable<AttendanceRecord> rows)
+    {
+        var counts = new int[4];
+        foreach (var row in rows.Where(r => r.InPunch is not null && r.OutPunch is not null))
+        {
+            var minutes = TemplateWriter.WorkedMinutes(row)
+                ?? throw new FormatException("Invalid normalized attendance punches.");
+            counts[minutes < 240 ? 0 : minutes < 480 ? 1 : minutes < 720 ? 2 : 3]++;
+        }
+        return Array.AsReadOnly(new[]
+        {
+            new DurationBucket("Under 4h", counts[0]),
+            new DurationBucket("4 to <8h", counts[1]),
+            new DurationBucket("8 to <12h", counts[2]),
+            new DurationBucket("12h+", counts[3]),
+        });
     }
 }

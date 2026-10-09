@@ -429,18 +429,10 @@
                     <Label Text="Punch evidence only. No punches does not establish absence or leave. Average hours uses complete pairs."
                            FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
-                    <HorizontalStackLayout Spacing="10">
-                        <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                                StrokeShape="RoundRectangle 16" Padding="16,10">
-                            <Border.Shadow><Shadow Brush="Black" Opacity="0.05" Radius="8" /></Border.Shadow>
-                            <VerticalStackLayout Spacing="0">
-                                <Label x:Name="DashEmployees" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                <Label Text="employees" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            </VerticalStackLayout>
-                        </Border>
-                    </HorizontalStackLayout>
+                    <Grid x:Name="DashKpis" RowSpacing="12" ColumnSpacing="12" SizeChanged="OnDashboardKpiSizeChanged" />
+                    <VerticalStackLayout x:Name="DashVisuals" Spacing="16" />
 
-                    <Border Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                    <Border x:Name="DashCoverageCard" Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                             StrokeShape="RoundRectangle 16" Padding="14">
                         <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
                         <VerticalStackLayout Spacing="8">
