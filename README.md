@@ -59,6 +59,8 @@ Partial monthly exports count **only the exported dates** in attendance totals. 
 
 Monthly attendance totals are always calculated from unique exported dates using per-date punches, status codes, and the configured holiday and weekly-off calendar. Employee-level source summary counts do not override these calculations. This prevents a 30-day export from producing more than 30 attendance days and removes repeated source-total inconsistency messages from Remarks. The app shows a neutral calculation note; when daily status codes are unavailable, absence and weekly off are inferred from punches and the calendar, and approved leave dates cannot be established from aggregate counts alone. Partial-export and missing-calendar warnings remain available.
 
+The source export's Joining Date is not used to filter attendance or adjust totals. Client exports can contain a shared setup date that conflicts with actual punch records. Preserve all exported attendance dates; any employment-date filtering must use separately verified HR dates.
+
 The bundled holiday calendar is for **2026**. For another year, configure that year's holidays and working Saturdays in **Manage holidays**. If no calendar entries exist for the report year, the app and the workbook's Holiday Details sheet show a warning.
 
 Working Saturday entries must fall on Saturdays. Calendar edits preserve changes to other entries from another app window; competing edits to the same entry require reloading the manager. Invalid calendar entries produce a validation error without replacing the saved calendar.

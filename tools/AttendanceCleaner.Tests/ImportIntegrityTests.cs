@@ -163,6 +163,33 @@ public sealed class ImportIntegrityTests
         Assert.Contains("unsupported text encoding", exception.Message);
     }
 
+    [Theory]
+    [InlineData("2026-09-18")]
+    [InlineData("2027-01-01")]
+    [InlineData("")]
+    [InlineData("not a verified date")]
+    public void Source_joining_date_does_not_remove_recorded_attendance(string joiningDate)
+    {
+        var identity = Identity.Replace("</tr>",
+            $"<td>Joining Date</td><td>{joiningDate}</td></tr>", StringComparison.Ordinal);
+        var report = AttendanceParser.Parse(Block(identity,
+            Metric("Check-in1", "07:00") + Metric("Check-out1", "16:00")));
+        var record = Assert.Single(report.Records);
+        Assert.Equal(new DateOnly(2026, 9, 1), record.Date);
+        Assert.Equal("07:00", record.InPunch);
+        Assert.Equal("16:00", record.OutPunch);
+
+        var daily = Assert.Single(TemplateWriter.BuildRows(report.Records));
+        Assert.Equal("09:00", daily.TotalHours);
+        var dashboard = AttendanceAnalytics.Build(report.Records);
+        Assert.Equal(1, dashboard.TotalRows);
+        Assert.Equal(1, dashboard.Present);
+        Assert.Equal("09:00", dashboard.AverageHours);
+        var monthly = Assert.Single(MonthlyTemplateWriter.BuildSummaries(report.Records, [], record.Date));
+        Assert.Equal(1m, monthly.PresentDays);
+        Assert.Equal(9m, monthly.TotalHours);
+    }
+
     private const string Identity = "<tr><td>Person ID</td><td>3</td><td>Employee Name</td><td>AJITH</td></tr>";
 
     private static string Metric(string label, string value) => $"<tr><td>{label}</td><td>{value}</td></tr>";
