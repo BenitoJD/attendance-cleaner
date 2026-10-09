@@ -234,6 +234,7 @@ public partial class MainPage : ContentPage
         MonthlyOptionsPanel.IsVisible = false;
         UploadCard.IsVisible = false;
         ConvertSection.IsVisible = false;
+        PageScroll.IsVisible = false;
         HolidaySection.IsVisible = true;
         HolidayManagerCard.IsVisible = true;
         HolidayList.IsVisible = _holidaysLoaded;
@@ -262,6 +263,7 @@ public partial class MainPage : ContentPage
     {
         if (_holidayOperationInProgress) return;
         HolidaySection.IsVisible = false;
+        PageScroll.IsVisible = true;
         HolidayManagerCard.IsVisible = false;
         ConvertSection.IsVisible = true;
         MonthlyOptionsPanel.IsVisible = true;
@@ -632,6 +634,7 @@ public partial class MainPage : ContentPage
             ConfigureDashboardSelection();
 
             ShowTableTab();
+            await PageScroll.ScrollToAsync(0, 0, false);
             ConvertSection.IsVisible = false;
             ResultsSection.IsVisible = true;
             _selectedFile = null;
@@ -717,9 +720,8 @@ public partial class MainPage : ContentPage
 
     private async void OnConvertAnotherClicked(object? sender, EventArgs e)
     {
-        // Reset the existing native scroll view before hiding it or replacing its content.
-        if (DashboardSection.Handler is not null)
-            await DashboardSection.ScrollToAsync(0, 0, false);
+        // Reset the shared page before replacing the current report with the upload screen.
+        await PageScroll.ScrollToAsync(0, 0, false);
         ResultsSection.IsVisible = false;
         ConvertSection.IsVisible = true;
         FileNameLabel.Text = "";
@@ -1066,6 +1068,7 @@ public partial class MainPage : ContentPage
             }
             return new ViewCell { View = grid };
         });
+        ItemsView.HeightRequest = rows.Count * ItemsView.RowHeight;
         ItemsView.ItemsSource = rows.Select((r, i) => new DisplayRow(r, i % 2 == 1)).ToList();
     }
 

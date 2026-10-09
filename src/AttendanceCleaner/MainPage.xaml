@@ -7,7 +7,10 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource CanvasLight}, Dark={StaticResource CanvasDark}}"
              Title="Attendance Report Studio">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid>
+        <!-- One vertical scroll owns the clock, report summary, tabs and report content. -->
+        <ScrollView x:Name="PageScroll" VerticalScrollBarVisibility="Default">
+            <Grid RowDefinitions="Auto,Auto">
 
         <Border Grid.Row="0" Margin="20,8,20,0"
                 Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
@@ -33,7 +36,7 @@
         </Border>
 
         <!-- ═══════════ choose report type and upload ═══════════ -->
-        <ScrollView x:Name="ConvertSection" Grid.Row="1">
+        <ContentView x:Name="ConvertSection" Grid.Row="1">
             <VerticalStackLayout
                 VerticalOptions="Center"
                 HorizontalOptions="Center"
@@ -262,98 +265,12 @@
                     </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>
-        </ScrollView>
-
-        <!-- Dedicated editing workspace: use the window width instead of the setup-card width. -->
-        <Grid x:Name="HolidaySection" Grid.Row="1" IsVisible="False"
-              Margin="24,28,24,24" RowDefinitions="Auto,Auto,*" RowSpacing="24">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <VerticalStackLayout Spacing="8">
-                    <Label Text="Holiday details" FontSize="28" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                    <Label Text="Manage holiday dates, names, and categories. Use Edit to update a holiday."
-                           FontSize="14" LineBreakMode="WordWrap"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                </VerticalStackLayout>
-                <Button x:Name="HolidayBackButton" Grid.Column="1" Text="Back" FontSize="14" FontAttributes="Bold"
-                        Padding="20,12" CornerRadius="10" VerticalOptions="Start"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
-                        TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
-                        Clicked="OnHolidayManagerBackClicked" />
-            </Grid>
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="20">
-                <Button x:Name="AddHolidayButton" Text="+ Add holiday" HorizontalOptions="Start"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
-                        TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
-                        FontSize="14" FontAttributes="Bold" CornerRadius="10" Padding="24,12"
-                        Clicked="OnAddHolidayClicked" />
-                <ActivityIndicator x:Name="HolidayBusyIndicator" Grid.Column="1" IsVisible="False" IsRunning="False"
-                                   Color="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
-                <Label x:Name="HolidaySaveStatus" Grid.Column="2" Text="" FontSize="13"
-                       VerticalTextAlignment="Center" LineBreakMode="WordWrap"
-                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-            </Grid>
-            <Border x:Name="HolidayManagerCard" Grid.Row="2" IsVisible="False"
-                    Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
-                    StrokeThickness="1" StrokeShape="RoundRectangle 16" Padding="20"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
-                <ScrollView x:Name="HolidayTableScroll" Orientation="Horizontal"
-                            HorizontalScrollBarVisibility="Default" VerticalScrollBarVisibility="Default"
-                            SizeChanged="OnHolidayTableSizeChanged">
-                    <Grid x:Name="HolidayTableLayout" MinimumWidthRequest="1040" RowDefinitions="Auto,*" RowSpacing="12">
-                        <!-- Header and virtualized rows use the same column layout resource. -->
-                        <Grid x:Name="HolidayTableHeader" ColumnDefinitions="{local:HolidayTableColumns}"
-                              ColumnSpacing="20" Padding="0,0,0,12" MinimumHeightRequest="40">
-                            <Label Text="Date" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            <Label Grid.Column="1" Text="Holiday name" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            <Label Grid.Column="2" Text="Category" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            <Label Grid.Column="3" Text="Actions" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                        </Grid>
-                        <CollectionView x:Name="HolidayList" Grid.Row="1" SelectionMode="None"
-                                        ItemSizingStrategy="MeasureAllItems" VerticalScrollBarVisibility="Default">
-                            <CollectionView.EmptyView>
-                                <Label Text="No holidays yet. Use Add holiday to create one." Margin="12,24" FontSize="14"
-                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            </CollectionView.EmptyView>
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="core:HolidayEntry">
-                                    <Grid ColumnDefinitions="{local:HolidayTableColumns}" ColumnSpacing="20"
-                                          MinimumHeightRequest="76" Padding="0,12">
-                                        <Label Margin="12,0" Text="{Binding Date, StringFormat='{0:dd/MM/yyyy}'}" FontSize="14" VerticalTextAlignment="Center"
-                                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
-                                        <Label Grid.Column="1" Margin="12,0" Text="{Binding Name}" FontSize="14" VerticalTextAlignment="Center" LineBreakMode="WordWrap"
-                                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
-                                        <Label Grid.Column="2" Margin="12,0" Text="{Binding Category}" FontSize="14" VerticalTextAlignment="Center" LineBreakMode="WordWrap"
-                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                        <Grid Grid.Column="3" ColumnDefinitions="*,*" ColumnSpacing="8" VerticalOptions="Center">
-                                            <Button Text="Edit" FontSize="13" Padding="12,10" CornerRadius="8"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}"
-                                                    TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
-                                                    SemanticProperties.Description="{Binding Name, StringFormat='Edit {0}'}"
-                                                    Clicked="OnEditHolidayClicked" />
-                                            <Button Grid.Column="1" Text="Delete" FontSize="13" Padding="12,10" CornerRadius="8" BackgroundColor="Transparent"
-                                                    TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}"
-                                                    SemanticProperties.Description="{Binding Name, StringFormat='Delete {0}'}"
-                                                    Clicked="OnDeleteHolidayClicked" />
-                                        </Grid>
-                                    </Grid>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </Grid>
-                </ScrollView>
-            </Border>
-        </Grid>
-
+        </ContentView>
 
         <!-- ═══════════ results screen: saved report summary + tabs ═══════════ -->
         <Grid x:Name="ResultsSection" Grid.Row="1"
               IsVisible="False"
-              RowDefinitions="Auto,Auto,*"
+              RowDefinitions="Auto,Auto,Auto"
               Padding="20"
               RowSpacing="12">
 
@@ -463,21 +380,21 @@
                 </Border.Shadow>
                 <Grid>
                     <ScrollView x:Name="DailyTableScroll" Orientation="Horizontal">
-                        <Grid x:Name="TableGrid" RowDefinitions="Auto,*" RowSpacing="0">
+                        <Grid x:Name="TableGrid" RowDefinitions="Auto,Auto" RowSpacing="0">
                             <ListView x:Name="ItemsView" Grid.Row="1" RowHeight="34"
                                       CachingStrategy="RecycleElement" SeparatorVisibility="None"
                                       BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
                         </Grid>
                     </ScrollView>
-                    <Grid x:Name="MonthlyTableContainer" RowDefinitions="Auto,*" IsVisible="False">
+                    <Grid x:Name="MonthlyTableContainer" RowDefinitions="Auto,Auto" IsVisible="False">
                         <HorizontalStackLayout Padding="8,6" Spacing="8">
                             <Button x:Name="MonthlyAttendanceSheetBtn" Text="Attendance" CornerRadius="8" Padding="14,7"
                                     FontSize="12" FontAttributes="Bold" Clicked="OnMonthlyAttendanceSheetClicked" />
                             <Button x:Name="MonthlyHolidaySheetBtn" Text="Holiday Details" CornerRadius="8" Padding="14,7"
                                     FontSize="12" FontAttributes="Bold" Clicked="OnMonthlyHolidaySheetClicked" />
                         </HorizontalStackLayout>
-                        <ScrollView x:Name="MonthlyTableScroll" Grid.Row="1" Orientation="Both"
-                                    HorizontalScrollBarVisibility="Always" VerticalScrollBarVisibility="Always">
+                        <ScrollView x:Name="MonthlyTableScroll" Grid.Row="1" Orientation="Horizontal"
+                                    HorizontalScrollBarVisibility="Always">
                             <Grid>
                                 <GraphicsView x:Name="MonthlyPreviewCanvas" />
                                 <Image x:Name="MonthlyTemplateLogoPreview" WidthRequest="47" HeightRequest="30"
@@ -490,7 +407,7 @@
             </Border>
 
             <!-- dashboard tab -->
-            <ScrollView x:Name="DashboardSection" Grid.Row="2" IsVisible="False">
+            <ContentView x:Name="DashboardSection" Grid.Row="2" IsVisible="False">
                 <VerticalStackLayout Spacing="12">
 
                     <Label x:Name="DashScope" FontSize="20" FontAttributes="Bold"
@@ -561,14 +478,103 @@
 
                     <Label x:Name="DashStatus" Text="" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                 </VerticalStackLayout>
-            </ScrollView>
+            </ContentView>
         </Grid>
 
-        <ActivityIndicator Grid.Row="1" x:Name="Spinner"
+            </Grid>
+        </ScrollView>
+
+        <!-- Dedicated editing workspace: use the window width instead of the setup-card width. -->
+        <Grid x:Name="HolidaySection" IsVisible="False"
+              Margin="24,28,24,24" RowDefinitions="Auto,Auto,*" RowSpacing="24">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Holiday details" FontSize="28" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Label Text="Manage holiday dates, names, and categories. Use Edit to update a holiday."
+                           FontSize="14" LineBreakMode="WordWrap"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                </VerticalStackLayout>
+                <Button x:Name="HolidayBackButton" Grid.Column="1" Text="Back" FontSize="14" FontAttributes="Bold"
+                        Padding="20,12" CornerRadius="10" VerticalOptions="Start"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
+                        TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
+                        Clicked="OnHolidayManagerBackClicked" />
+            </Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="20">
+                <Button x:Name="AddHolidayButton" Text="+ Add holiday" HorizontalOptions="Start"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
+                        TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
+                        FontSize="14" FontAttributes="Bold" CornerRadius="10" Padding="24,12"
+                        Clicked="OnAddHolidayClicked" />
+                <ActivityIndicator x:Name="HolidayBusyIndicator" Grid.Column="1" IsVisible="False" IsRunning="False"
+                                   Color="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
+                <Label x:Name="HolidaySaveStatus" Grid.Column="2" Text="" FontSize="13"
+                       VerticalTextAlignment="Center" LineBreakMode="WordWrap"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+            </Grid>
+            <Border x:Name="HolidayManagerCard" Grid.Row="2" IsVisible="False"
+                    Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                    StrokeThickness="1" StrokeShape="RoundRectangle 16" Padding="20"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+                <ScrollView x:Name="HolidayTableScroll" Orientation="Horizontal"
+                            HorizontalScrollBarVisibility="Default" VerticalScrollBarVisibility="Default"
+                            SizeChanged="OnHolidayTableSizeChanged">
+                    <Grid x:Name="HolidayTableLayout" MinimumWidthRequest="1040" RowDefinitions="Auto,*" RowSpacing="12">
+                        <!-- Header and virtualized rows use the same column layout resource. -->
+                        <Grid x:Name="HolidayTableHeader" ColumnDefinitions="{local:HolidayTableColumns}"
+                              ColumnSpacing="20" Padding="0,0,0,12" MinimumHeightRequest="40">
+                            <Label Text="Date" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            <Label Grid.Column="1" Text="Holiday name" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            <Label Grid.Column="2" Text="Category" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            <Label Grid.Column="3" Text="Actions" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </Grid>
+                        <CollectionView x:Name="HolidayList" Grid.Row="1" SelectionMode="None"
+                                        ItemSizingStrategy="MeasureAllItems" VerticalScrollBarVisibility="Default">
+                            <CollectionView.EmptyView>
+                                <Label Text="No holidays yet. Use Add holiday to create one." Margin="12,24" FontSize="14"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="core:HolidayEntry">
+                                    <Grid ColumnDefinitions="{local:HolidayTableColumns}" ColumnSpacing="20"
+                                          MinimumHeightRequest="76" Padding="0,12">
+                                        <Label Margin="12,0" Text="{Binding Date, StringFormat='{0:dd/MM/yyyy}'}" FontSize="14" VerticalTextAlignment="Center"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                                        <Label Grid.Column="1" Margin="12,0" Text="{Binding Name}" FontSize="14" VerticalTextAlignment="Center" LineBreakMode="WordWrap"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
+                                        <Label Grid.Column="2" Margin="12,0" Text="{Binding Category}" FontSize="14" VerticalTextAlignment="Center" LineBreakMode="WordWrap"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                        <Grid Grid.Column="3" ColumnDefinitions="*,*" ColumnSpacing="8" VerticalOptions="Center">
+                                            <Button Text="Edit" FontSize="13" Padding="12,10" CornerRadius="8"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceAltLight}, Dark={StaticResource SurfaceAltDark}}"
+                                                    TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}"
+                                                    SemanticProperties.Description="{Binding Name, StringFormat='Edit {0}'}"
+                                                    Clicked="OnEditHolidayClicked" />
+                                            <Button Grid.Column="1" Text="Delete" FontSize="13" Padding="12,10" CornerRadius="8" BackgroundColor="Transparent"
+                                                    TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}"
+                                                    SemanticProperties.Description="{Binding Name, StringFormat='Delete {0}'}"
+                                                    Clicked="OnDeleteHolidayClicked" />
+                                        </Grid>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+                </ScrollView>
+            </Border>
+        </Grid>
+
+
+        <ActivityIndicator x:Name="Spinner"
                            IsRunning="False" IsVisible="False"
                            Color="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
                            VerticalOptions="Center" HorizontalOptions="Center" />
-        <local:HolidayEditorDialog x:Name="HolidayDialog" Grid.RowSpan="2" IsVisible="False" ZIndex="10" />
+        <local:HolidayEditorDialog x:Name="HolidayDialog" IsVisible="False" ZIndex="10" />
     </Grid>
 
 </ContentPage>
