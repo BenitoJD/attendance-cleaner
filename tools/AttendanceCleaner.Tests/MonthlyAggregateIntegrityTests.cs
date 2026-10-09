@@ -18,7 +18,7 @@ public sealed class MonthlyAggregateIntegrityTests
         Assert.Equal(2m, summary.PresentDays);
         Assert.Equal(0m, summary.AbsentDays);
         Assert.Equal(0m, summary.LeaveDays);
-        Assert.NotNull(summary.Warning);
+        Assert.Null(summary.Warning);
         Assert.Equal(1m, sourceTotals.AbsentDays);
     }
 
@@ -36,20 +36,20 @@ public sealed class MonthlyAggregateIntegrityTests
 
         Assert.Equal(9m, summary.PresentDays);
         Assert.Equal(16m, summary.PresentDays + summary.AbsentDays + summary.LeaveDays);
-        Assert.NotNull(summary.Warning);
+        Assert.Null(summary.Warning);
         Assert.Equal(81m, summary.TotalDutyHours);
     }
 
     [Fact]
-    public void Coherent_fractional_source_counts_are_preserved_with_weekly_off_reclassification()
+    public void Coherent_fractional_source_counts_do_not_override_daily_records()
     {
         var records = Enumerable.Range(1, 6).Select(day => Record(day) with { InPunch = null, OutPunch = null }).ToArray();
         var totals = new MonthlyEmployeeTotals("007", "Example", 0, 5.5m, 0m, 0.5m);
         var summary = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, [], Month, [totals]));
 
         Assert.Equal(0m, summary.PresentDays);
-        Assert.Equal(3.5m, summary.AbsentDays);
-        Assert.Equal(2.5m, summary.LeaveDays);
+        Assert.Equal(4m, summary.AbsentDays);
+        Assert.Equal(2m, summary.LeaveDays);
         Assert.Null(summary.Warning);
     }
 
@@ -69,7 +69,7 @@ public sealed class MonthlyAggregateIntegrityTests
             Assert.Equal(1m, summary.PresentDays);
             Assert.Equal(1m, summary.AbsentDays);
             Assert.Equal(0m, summary.LeaveDays);
-            Assert.NotNull(summary.Warning);
+            Assert.Null(summary.Warning);
         }
     }
 
@@ -88,7 +88,7 @@ public sealed class MonthlyAggregateIntegrityTests
     [Theory]
     [InlineData(MonthlyTemplateKind.DutyAndOvertime)]
     [InlineData(MonthlyTemplateKind.InAndOut)]
-    public void Workbook_and_preview_show_recalculation_warning_and_partial_export_note(MonthlyTemplateKind kind)
+    public void Workbook_and_preview_omit_aggregate_warning_and_keep_partial_export_note(MonthlyTemplateKind kind)
     {
         var records = new[] { Record(1), Record(2) with { OutPunch = null } };
         var totals = new MonthlyEmployeeTotals("007", "Example", 0, 1m, 2m, 0m);
@@ -104,13 +104,53 @@ public sealed class MonthlyAggregateIntegrityTests
             Assert.Equal(0m, sheet.Cell(6, summaryColumn + 4).GetValue<decimal>());
             var remarks = sheet.Cell(6, summaryColumn + 5);
             Assert.Contains("Reported dates: 2 of 30 days", remarks.GetString());
-            Assert.Contains("Source totals inconsistent", remarks.GetString());
+            Assert.DoesNotContain("Source totals inconsistent", remarks.GetString());
             Assert.True(remarks.Style.Alignment.WrapText);
-            Assert.True(sheet.Row(6).Height >= 60);
+            Assert.True(sheet.Row(6).Height >= 34);
         }
         stream.Position = 0;
         var preview = MonthlyTemplateWriter.ReadPreview(stream);
-        Assert.Contains(preview.Sheets[0].Cells, cell => cell.Text.Contains("Source totals inconsistent", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Sheets[0].Cells, cell => cell.Text.Contains("Source totals inconsistent", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Even_balanced_source_totals_cannot_replace_daily_attendance_or_invent_leave()
+    {
+        var records = new[] { Record(1), Record(2) with { OutPunch = null },
+            Record(3) with { InPunch = null, OutPunch = null } };
+        var totals = new MonthlyEmployeeTotals("007", "Example", 0, 0m, 1m, 2m);
+        var actual = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, [], Month, [totals]));
+        var expected = Assert.Single(MonthlyTemplateWriter.BuildSummaries(records, [], Month));
+
+        Assert.Equal(expected, actual);
+        Assert.Equal(2m, actual.PresentDays);
+        Assert.Equal(1m, actual.AbsentDays);
+        Assert.Equal(0m, actual.LeaveDays);
+    }
+
+    [Theory]
+    [InlineData(MonthlyTemplateKind.DutyAndOvertime)]
+    [InlineData(MonthlyTemplateKind.InAndOut)]
+    public void Full_month_workbook_has_blank_remarks_after_daily_recalculation(MonthlyTemplateKind kind)
+    {
+        var records = Enumerable.Range(1, 30).Select(Record).ToArray();
+        var totals = new MonthlyEmployeeTotals("007", "Example", 0, 5m, 29m, 0m);
+        using var stream = new MemoryStream();
+        MonthlyTemplateWriter.Write(records, [], kind, stream, [totals]);
+        stream.Position = 0;
+        using (var workbook = new XLWorkbook(stream))
+        {
+            var sheet = workbook.Worksheet(TemplateSpec.SheetName);
+            const int summaryStart = 65;
+            Assert.Equal(30m, sheet.Cell(6, summaryStart + 2).GetValue<decimal>());
+            Assert.Equal(0m, sheet.Cell(6, summaryStart + 3).GetValue<decimal>());
+            Assert.Equal(0m, sheet.Cell(6, summaryStart + 4).GetValue<decimal>());
+            Assert.Equal("", sheet.Cell(6, summaryStart + 5).GetString());
+        }
+        stream.Position = 0;
+        var preview = MonthlyTemplateWriter.ReadPreview(stream);
+        Assert.DoesNotContain(preview.Sheets.SelectMany(sheet => sheet.Cells),
+            cell => cell.Text.Contains("Source totals inconsistent", StringComparison.Ordinal));
     }
 
     private static AttendanceRecord Record(int day) => new("007", "Example", "", Month.AddDays(day - 1), "07:00", "16:00", 0);

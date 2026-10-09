@@ -498,6 +498,8 @@ public partial class MainPage : ContentPage
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
         StatusLabel.Text = "Reading the report...";
+        ConversionNoteLabel.Text = "";
+        ConversionNoteLabel.IsVisible = false;
         ConversionWarningLabel.Text = "";
         ConversionWarningLabel.IsVisible = false;
 
@@ -543,18 +545,16 @@ public partial class MainPage : ContentPage
                         : TemplateSpec.DailyFileName,
                     dates[0]);
 
-                var monthlyWarning = selectedCategory == ReportCategory.Monthly
-                    && report.Format == AttendanceExportFormat.MonthlyRows
-                    && report.Records.All(record => string.IsNullOrWhiteSpace(record.Status))
-                    ? report.EmployeeTotals?.Any(total => total.AbsentDays is not null
-                        || total.AttendedDays is not null
-                        || total.LeaveDays is not null) == true
-                        ? "Daily leave/absence codes are unavailable. Consistent source totals are used; inconsistent totals are calculated from punches and the calendar."
-                        : "This report has no daily leave/absence codes or summary counts. Monthly absence and leave are inferred from punches and the calendar."
+                var monthlyNote = selectedCategory == ReportCategory.Monthly
+                    ? "Attendance totals calculated from daily records."
+                        + (report.Records.All(record => string.IsNullOrWhiteSpace(record.Status))
+                            ? " Daily leave codes are unavailable; absence and weekly off are inferred from punches and the calendar."
+                            : "")
                     : "";
+                var monthlyWarning = "";
                 if (isMonthlyReport)
                 {
-                    var warnings = new List<string> { monthlyWarning, HolidayCalendarStore.GetYearWarning(holidays, dates[0].Year) };
+                    var warnings = new List<string> { HolidayCalendarStore.GetYearWarning(holidays, dates[0].Year) };
                     if (dates.Count < DateTime.DaysInMonth(dates[0].Year, dates[0].Month))
                         warnings.Add("Attendance totals count only exported dates. Unreported dates are left blank.");
                     monthlyWarning = string.Join(" ", warnings.Where(warning => !string.IsNullOrWhiteSpace(warning)));
@@ -565,9 +565,7 @@ public partial class MainPage : ContentPage
                 var summaries = isMonthlyReport
                     ? MonthlyTemplateWriter.BuildSummaries(report.Records, holidays, dates[0], report.EmployeeTotals)
                     : null;
-                if (summaries?.Any(summary => summary.Warning is not null) == true)
-                    monthlyWarning += " Some source day totals overlap or do not match the exported dates. Affected employees are marked in Remarks; each exported date is counted once.";
-                return (report, dates, fileName, monthlyWarning, holidays, dashboardSelection, summaries);
+                return (report, dates, fileName, monthlyWarning, monthlyNote, holidays, dashboardSelection, summaries);
             });
 
             // 2. let the user choose where to save it
@@ -621,6 +619,8 @@ public partial class MainPage : ContentPage
                 ? "Tap to share or save a copy"
                 : "Tap to open the saved report";
             SavedPathLabel.Text = $"Saved at: {outputPath}";
+            ConversionNoteLabel.Text = parsed.monthlyNote;
+            ConversionNoteLabel.IsVisible = !string.IsNullOrWhiteSpace(parsed.monthlyNote);
             ConversionWarningLabel.Text = parsed.monthlyWarning;
             ConversionWarningLabel.IsVisible = !string.IsNullOrWhiteSpace(parsed.monthlyWarning);
             _lastOutputPath = outputPath;
@@ -743,6 +743,8 @@ public partial class MainPage : ContentPage
         SavedLabel.Text = "";
         SavedLocationLabel.Text = "";
         SavedPathLabel.Text = "";
+        ConversionNoteLabel.Text = "";
+        ConversionNoteLabel.IsVisible = false;
         ConversionWarningLabel.Text = "";
         ConversionWarningLabel.IsVisible = false;
         _dashboard = null;

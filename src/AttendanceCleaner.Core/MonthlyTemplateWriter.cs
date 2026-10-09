@@ -59,6 +59,9 @@ public static class MonthlyTemplateWriter
         DateOnly month,
         IReadOnlyList<MonthlyEmployeeTotals>? employeeTotals = null)
     {
+        // Summary aggregates can overlap or describe a different period. Attendance is
+        // always calculated from unique exported dates, daily statuses and the calendar.
+        // Keep employeeTotals in the public signature for existing callers.
         holidays = HolidayCalendarStore.ValidateAndSort(holidays);
         var records = TemplateWriter.DistinctEmployeeDates(source
             .Where(record => record.Date.Year == month.Year && record.Date.Month == month.Month));
@@ -75,8 +78,6 @@ public static class MonthlyTemplateWriter
         var summaries = new List<MonthlyEmployeeSummary>();
         foreach (var group in EmployeeGroups(records))
         {
-            var reportedTotals = employeeTotals?.FirstOrDefault(total =>
-                total.Id == group.Id && string.Equals(total.Name, group.Name, StringComparison.Ordinal));
             var byDate = group.Records.GroupBy(record => record.Date)
                 .ToDictionary(day => day.Key, day => day.OrderBy(record => record.Order).First());
             var scheduledWorkdays = byDate.Keys
@@ -87,7 +88,6 @@ public static class MonthlyTemplateWriter
             long dutyMinutes = 0;
             long overtimeMinutes = 0;
             long elapsedMinutes = 0;
-            string? warning = null;
 
             foreach (var (date, record) in byDate)
             {
@@ -124,41 +124,6 @@ public static class MonthlyTemplateWriter
                 }
             }
 
-            if (reportedTotals is not null
-                && !group.Records.Any(record => !string.IsNullOrWhiteSpace(record.Status)))
-            {
-                // The full-version monthly export has aggregate absence/leave totals, but no
-                // daily status row. Move its unworked weekly-off and credited-holiday days
-                // out of the reported absence total; exact leave dates remain unavailable.
-                var unworkedDaysOff = byDate
-                    .Count(day => !mandatoryHolidayDates.Contains(day.Key)
-                        && IsRegularDayOff(day.Key, workingSaturdayDates)
-                        && !IsPresent(day.Value));
-                var creditedHolidays = byDate
-                    .Count(day => mandatoryHolidayDates.Contains(day.Key) && !IsPresent(day.Value));
-
-                var countsFitExport = new[] { reportedTotals.AttendedDays, reportedTotals.AbsentDays, reportedTotals.LeaveDays }
-                    .All(count => count is null || count >= 0 && count <= byDate.Count);
-                if (countsFitExport)
-                {
-                    var reportedPresent = reportedTotals.AttendedDays is { } attendedDays
-                        ? attendedDays + creditedHolidays : present;
-                    var reportedAbsent = reportedTotals.AbsentDays is { } absentDays
-                        ? Math.Max(0m, absentDays - unworkedDaysOff - creditedHolidays) : absent;
-                    var reportedLeave = reportedTotals.LeaveDays is { } leaveDays
-                        ? leaveDays + unworkedDaysOff : leave;
-                    if (reportedPresent + reportedAbsent + reportedLeave == byDate.Count)
-                    {
-                        present = reportedPresent;
-                        absent = reportedAbsent;
-                        leave = reportedLeave;
-                    }
-                    else countsFitExport = false;
-                }
-                if (!countsFitExport)
-                    warning = "Source totals inconsistent; counted each exported date once.";
-            }
-
             summaries.Add(new MonthlyEmployeeSummary(
                 group.Id,
                 group.Name,
@@ -169,8 +134,7 @@ public static class MonthlyTemplateWriter
                 leave,
                 dutyMinutes / 60m,
                 overtimeMinutes / 60m,
-                elapsedMinutes / 60m,
-                warning));
+                elapsedMinutes / 60m));
         }
         return summaries;
     }

@@ -338,10 +338,14 @@
                            FontSize="10"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                            MaxLines="1" LineBreakMode="TailTruncation" />
-                    <Label x:Name="ConversionWarningLabel" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
-                           FontSize="11"
-                           TextColor="{AppThemeBinding Light=#92400E, Dark=#FCD34D}"
-                           MaxLines="2" LineBreakMode="WordWrap" IsVisible="False" />
+                    <VerticalStackLayout Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Spacing="4">
+                        <Label x:Name="ConversionNoteLabel" FontSize="11"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                               LineBreakMode="WordWrap" IsVisible="False" />
+                        <Label x:Name="ConversionWarningLabel" FontSize="11"
+                               TextColor="{AppThemeBinding Light=#92400E, Dark=#FCD34D}"
+                               LineBreakMode="WordWrap" IsVisible="False" />
+                    </VerticalStackLayout>
                 </Grid>
             </Border>
 

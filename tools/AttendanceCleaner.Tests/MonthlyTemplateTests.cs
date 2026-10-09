@@ -245,7 +245,7 @@ public sealed class MonthlyTemplateTests
         Assert.Equal(1m, summary.PresentDays);
         Assert.Equal(21m, summary.AbsentDays);
         Assert.Equal(8m, summary.LeaveDays);
-        Assert.NotNull(summary.Warning);
+        Assert.Null(summary.Warning);
     }
 
     private static AttendanceRecord[] SampleRecords() =>
