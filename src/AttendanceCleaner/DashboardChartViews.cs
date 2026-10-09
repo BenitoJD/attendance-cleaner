@@ -17,10 +17,10 @@ internal static class DashboardChartViews
         container.Children.Clear();
         foreach (var (title, value, caption, color) in new[]
         {
-            ("Employees", d.EmployeeCount.ToString(CultureInfo.InvariantCulture), $"{d.Days.Count} exported date(s)", Blue),
-            ("Complete pairs", $"{d.PresentRate:0.0}%", $"{d.Present} of {d.TotalRows} records", Green),
-            ("Incomplete pairs", d.InPunchOnly.ToString(CultureInfo.InvariantCulture), "Needs punch review", Amber),
-            ("Average recorded span", d.AverageHours ?? "No data", "Complete pairs only", Green),
+            ("Employees", d.EmployeeCount.ToString(CultureInfo.InvariantCulture), $"Dates in file: {d.Days.Count}", Blue),
+            ("Both punches", $"{d.PresentRate:0.0}%", $"{d.Present} of {d.TotalRows} records", Green),
+            ("One punch missing", d.InPunchOnly.ToString(CultureInfo.InvariantCulture), "Check these punches", Amber),
+            ("Average time", d.AverageHours ?? "No data", "Both punches only", Green),
         })
         {
             var content = new VerticalStackLayout { Spacing = 6 };
@@ -74,17 +74,17 @@ internal static class DashboardChartViews
 
     private static Border Completeness(Dashboard d)
     {
-        var content = Heading("Punch completeness", "Share of exported employee-date records");
+        var content = Heading("Punch records", "Each record is one employee on one date");
         var layout = new Grid { ColumnDefinitions = new ColumnDefinitionCollection(new ColumnDefinition(120), new ColumnDefinition(GridLength.Star)), ColumnSpacing = 12 };
         var ring = new GraphicsView
         {
             HeightRequest = 158,
             Drawable = new CompletenessRing(d),
         };
-        SemanticProperties.SetDescription(ring, $"{d.PresentRate:0.0}% complete. {d.Present} complete pairs, {d.InPunchOnly} incomplete pairs, {d.Absent} records without punches.");
+        SemanticProperties.SetDescription(ring, $"{d.PresentRate:0.0}% have both punches. {d.Present} records with both punches, {d.InPunchOnly} records with one punch missing, {d.Absent} records without punches.");
         layout.Add(ring);
         var legend = new VerticalStackLayout { Spacing = 14, VerticalOptions = LayoutOptions.Center };
-        foreach (var (label, count, color) in new[] { ("Complete pairs", d.Present, Green), ("Incomplete pairs", d.InPunchOnly, Amber), ("No punches", d.Absent, Slate) })
+        foreach (var (label, count, color) in new[] { ("Both punches", d.Present, Green), ("One punch missing", d.InPunchOnly, Amber), ("No punches", d.Absent, Slate) })
         {
             var item = new VerticalStackLayout { Spacing = 2 };
             item.Add(Text(label, 12, color: color, bold: true));
@@ -98,9 +98,9 @@ internal static class DashboardChartViews
 
     private static Border Distribution(Dashboard d)
     {
-        var content = Heading("Recorded span distribution", "Complete pairs only · breaks are not deducted");
+        var content = Heading("Time between punches", "Both punches only · includes break time");
         if (d.Present == 0 || d.DurationBuckets.Count == 0)
-            content.Add(Empty("No complete pairs to calculate recorded spans."));
+            content.Add(Empty("No records have both punches. Time cannot be calculated."));
         else
         {
             var bars = new Grid { ColumnSpacing = 10, HeightRequest = 158 };
@@ -126,7 +126,7 @@ internal static class DashboardChartViews
 
     private static Border HoursTrend(Dashboard d)
     {
-        var content = Heading("Average recorded span by date", "Each date averages its complete pairs · hh:mm labels · no data is not zero");
+        var content = Heading("Average time by date", "Average time each day · hours:minutes · no data means no records with both punches");
         var bars = new Grid { ColumnSpacing = 6 };
         var max = Math.Max(1, d.Days.Max(day => day.AverageMinutes ?? 0));
         foreach (var day in d.Days)
@@ -148,11 +148,11 @@ internal static class DashboardChartViews
 
     private static Border EmployeeSpans(Dashboard d, bool daily)
     {
-        var content = Heading(daily ? "Longest recorded spans" : "Longest average recorded spans",
-            "Up to 8 employees · highest spans first · complete pairs only");
+        var content = Heading(daily ? "Longest time between punches" : "Longest average time",
+            "Up to 8 employees · longest time first · both punches only");
         var employees = DashboardCharts.LongestEmployeeSpans(d);
         if (employees.Count == 0)
-            content.Add(Empty("No complete pairs to compare. Review missing punches in the employee summary."));
+            content.Add(Empty("No records have both punches. Check missing punches in the employee summary."));
         else
         {
             var max = Math.Max(1, employees.Max(employee => employee.Minutes));
@@ -164,7 +164,7 @@ internal static class DashboardChartViews
                 name.LineBreakMode = LineBreakMode.TailTruncation;
                 name.MaxLines = 1;
                 caption.Add(name);
-                caption.Add(Text($"ID {employee.Id} · {employee.CompletePairs} complete pair(s)", 10, secondary: true));
+                caption.Add(Text($"ID {employee.Id} · Both punches: {employee.CompletePairs}", 10, secondary: true));
                 row.Add(caption);
                 var track = new Grid { HeightRequest = 12, VerticalOptions = LayoutOptions.Center };
                 track.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(employee.Minutes, GridUnitType.Star)));
@@ -178,7 +178,7 @@ internal static class DashboardChartViews
                 content.Add(row);
             }
         }
-        content.Add(Text("Recorded spans measure time between punches, not productivity or payable hours.", 11, secondary: true));
+        content.Add(Text("Time is counted between in and out punches. It does not show work done or hours to pay.", 11, secondary: true));
         return Surface(content);
     }
 
@@ -236,7 +236,7 @@ internal static class DashboardChartViews
             canvas.DrawString($"{dashboard.PresentRate:0}%", 0, dirtyRect.Height / 2 - 18, dirtyRect.Width, 32, HorizontalAlignment.Center, VerticalAlignment.Center);
             canvas.FontColor = Slate;
             canvas.FontSize = 11;
-            canvas.DrawString("complete", 0, dirtyRect.Height / 2 + 14, dirtyRect.Width, 18, HorizontalAlignment.Center, VerticalAlignment.Center);
+            canvas.DrawString("both punches", 0, dirtyRect.Height / 2 + 14, dirtyRect.Width, 18, HorizontalAlignment.Center, VerticalAlignment.Center);
         }
     }
 }

@@ -29,9 +29,9 @@
                                     SemanticProperties.Description="Holiday date" />
                     </VerticalStackLayout>
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="Category" FontSize="14" FontAttributes="Bold"
+                        <Label Text="Type" FontSize="14" FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource TextBodyLight}, Dark={StaticResource TextBodyDark}}" />
-                        <Picker x:Name="CategoryPicker" FontSize="16" SemanticProperties.Description="Holiday category" />
+                        <Picker x:Name="CategoryPicker" FontSize="16" SemanticProperties.Description="Holiday type" />
                     </VerticalStackLayout>
                     <Label x:Name="ValidationMessage" IsVisible="False" FontSize="14" LineBreakMode="WordWrap"
                            TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />

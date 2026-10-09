@@ -57,7 +57,7 @@
                     <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                         <Label Text="Attendance Report Studio" FontSize="23" FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Label Text="Turn raw attendance exports into clear daily and monthly Excel or PDF reports."
+                        <Label Text="Create daily and monthly reports from your attendance file. Save as Excel or PDF."
                                FontSize="13" LineBreakMode="WordWrap"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
@@ -65,9 +65,9 @@
 
                 <VerticalStackLayout Spacing="12">
                     <VerticalStackLayout Spacing="4" Margin="0,4,0,0">
-                        <Label Text="CHOOSE A TEMPLATE" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
+                        <Label Text="CHOOSE A REPORT" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
                                TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
-                        <Label Text="Select the report period to continue." FontSize="14"
+                        <Label Text="Choose Daily or Monthly to continue." FontSize="14"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
 
@@ -86,7 +86,7 @@
                             <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                                 <Label Text="Daily" FontSize="16" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                <Label Text="Format a one-day attendance report" FontSize="12"
+                                <Label Text="Create a report for one day" FontSize="12"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                             <Button x:Name="DailyTemplateButton" Grid.Column="2" Text="Select"
@@ -113,7 +113,7 @@
                             <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                                 <Label Text="Monthly" FontSize="16" FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                <Label Text="Format a monthly attendance report" FontSize="12"
+                                <Label Text="Create a report for one month" FontSize="12"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                             <Button x:Name="MonthlyTemplateButton" Grid.Column="2" Text="Select"
@@ -131,9 +131,9 @@
                             StrokeShape="RoundRectangle 18" Padding="15">
                         <VerticalStackLayout Spacing="12">
                             <VerticalStackLayout Spacing="3">
-                                <Label Text="MONTHLY TEMPLATES" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
+                                <Label Text="MONTHLY REPORTS" FontSize="12" FontAttributes="Bold" CharacterSpacing="1"
                                        TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" />
-                                <Label Text="Choose the layout for your monthly attendance export." FontSize="13"
+                                <Label Text="Choose how your monthly report should look." FontSize="13"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </VerticalStackLayout>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
@@ -144,9 +144,9 @@
                                     <VerticalStackLayout Spacing="8">
                                         <Label Text="Duty + OT" FontSize="15" FontAttributes="Bold"
                                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                        <Label Text="Daily duty and overtime hours with monthly totals." FontSize="11"
+                                        <Label Text="Daily work and overtime hours, plus monthly totals." FontSize="11"
                                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                        <Button x:Name="MonthlyDutyButton" Text="Use this template"
+                                        <Button x:Name="MonthlyDutyButton" Text="Use this report"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
                                                 TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
                                                 FontSize="12" FontAttributes="Bold" CornerRadius="10" Padding="10,8"
@@ -160,9 +160,9 @@
                                     <VerticalStackLayout Spacing="8">
                                         <Label Text="IN / OUT" FontSize="15" FontAttributes="Bold"
                                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                                        <Label Text="Daily punch times with monthly attendance totals." FontSize="11"
+                                        <Label Text="Daily in and out times, plus monthly totals." FontSize="11"
                                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                        <Button x:Name="MonthlyInOutButton" Text="Use this template"
+                                        <Button x:Name="MonthlyInOutButton" Text="Use this report"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
                                                 TextColor="{AppThemeBinding Light={StaticResource ActionTextLight}, Dark={StaticResource ActionTextDark}}"
                                                 FontSize="12" FontAttributes="Bold" CornerRadius="10" Padding="10,8"
@@ -170,7 +170,7 @@
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
-                            <Button x:Name="ManageHolidaysButton" Text="Manage holiday details"
+                            <Button x:Name="ManageHolidaysButton" Text="Edit holidays"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}"
                                     TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
                                     FontSize="13" FontAttributes="Bold" CornerRadius="11" Padding="12,10"
@@ -228,13 +228,13 @@
                                     <x:String>Weekly — standard page (A4)</x:String>
                                 </Picker.Items>
                             </Picker>
-                            <Label Text="Full month keeps every date together. Larger employee lists continue on another page."
+                            <Label Text="Show all dates together. More employees may need extra pages."
                                    FontSize="12"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                         </VerticalStackLayout>
 
                         <Button x:Name="ConvertBtn"
-                                Text="Convert &amp; save"
+                                Text="Create &amp; save"
                                 BackgroundColor="{AppThemeBinding Light={StaticResource AccentSurfaceLight}, Dark={StaticResource AccentSurfaceDark}}" TextColor="{AppThemeBinding Light={StaticResource AccentTextLight}, Dark={StaticResource AccentTextDark}}"
                                 FontSize="16" FontAttributes="Bold"
                                 CornerRadius="14" HeightRequest="52"
@@ -299,7 +299,7 @@
                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
 
                     <Button Grid.Column="2" Grid.Row="0"
-                            Text="Convert another file"
+                            Text="Choose another file"
                             BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"
                             TextColor="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}"
                             BorderColor="{AppThemeBinding Light={StaticResource ActionLight}, Dark={StaticResource ActionDark}}"
@@ -424,13 +424,13 @@
                         <Button x:Name="DashMonthlyBtn" Text="Monthly" Clicked="OnDashboardMonthlyClicked" />
                     </HorizontalStackLayout>
                     <HorizontalStackLayout x:Name="DashDateControls" Spacing="12" IsVisible="False">
-                        <Label Text="Exported date" VerticalOptions="Center"
+                        <Label Text="Date in file" VerticalOptions="Center"
                                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                        <Picker x:Name="DashDatePicker" Title="Select an exported date" WidthRequest="220"
+                        <Picker x:Name="DashDatePicker" Title="Choose a date in the file" WidthRequest="220"
                                 SelectedIndexChanged="OnDashboardDateChanged"
                                 TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
                     </HorizontalStackLayout>
-                    <Label Text="Punch evidence only. No punches does not establish absence or leave. Average hours uses complete pairs."
+                    <Label Text="No punches does not always mean absent or on leave. Average time uses records with both in and out punches."
                            FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
                     <Grid x:Name="DashKpis" RowSpacing="12" ColumnSpacing="12" SizeChanged="OnDashboardKpiSizeChanged" />
@@ -440,11 +440,11 @@
                             StrokeShape="RoundRectangle 16" Padding="14">
                         <Border.Shadow><Shadow Brush="Black" Opacity="0.07" Radius="14" /></Border.Shadow>
                         <VerticalStackLayout Spacing="8">
-                            <Label Text="Punch coverage by exported date" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                            <Label Text="Punch records by date" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
                             <HorizontalStackLayout Spacing="12">
                                 <HorizontalStackLayout Spacing="4">
                                     <BoxView Color="{AppThemeBinding Light={StaticResource SuccessLight}, Dark={StaticResource SuccessDark}}" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="complete pairs" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                    <Label Text="both punches" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                                 <HorizontalStackLayout Spacing="4">
                                     <BoxView Color="#94A3B8" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
@@ -452,7 +452,7 @@
                                 </HorizontalStackLayout>
                                 <HorizontalStackLayout Spacing="4">
                                     <BoxView Color="{AppThemeBinding Light={StaticResource WarningLight}, Dark={StaticResource WarningDark}}" WidthRequest="12" HeightRequest="12" VerticalOptions="Center" />
-                                    <Label Text="incomplete pairs" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                    <Label Text="one punch missing" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                             </HorizontalStackLayout>
                             <ScrollView Orientation="Horizontal" HeightRequest="150">
@@ -487,7 +487,7 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Holiday details" FontSize="28" FontAttributes="Bold"
                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
-                    <Label Text="Manage holiday dates, names, and categories. Use Edit to update a holiday."
+                    <Label Text="Add holidays or change their dates, names, and types."
                            FontSize="14" LineBreakMode="WordWrap"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                 </VerticalStackLayout>
@@ -524,7 +524,7 @@
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             <Label Grid.Column="1" Text="Holiday name" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                            <Label Grid.Column="2" Text="Category" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
+                            <Label Grid.Column="2" Text="Type" Margin="12,0" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             <Label Grid.Column="3" Text="Actions" FontSize="13" FontAttributes="Bold" VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />

@@ -170,7 +170,7 @@ public partial class MainPage : ContentPage
         _selectedMonthlyTemplate = null;
         MonthlyOptionsPanel.IsVisible = false;
         HolidayManagerCard.IsVisible = false;
-        SelectedTemplateLabel.Text = "Daily template selected · one-day report";
+        SelectedTemplateLabel.Text = "Daily report · one day";
         UploadCard.IsVisible = true;
         UpdateTemplateCardSelection();
         await PickFileAsync();
@@ -192,8 +192,8 @@ public partial class MainPage : ContentPage
         MonthlyOptionsPanel.IsVisible = true;
         HolidayManagerCard.IsVisible = false;
         SelectedTemplateLabel.Text = kind == MonthlyTemplateKind.DutyAndOvertime
-            ? "Monthly template selected · Duty + OT summary"
-            : "Monthly template selected · IN / OUT punch report";
+            ? "Monthly report · Duty + OT"
+            : "Monthly report · IN / OUT";
         UploadCard.IsVisible = true;
         UpdateTemplateCardSelection();
         UpdateMonthlyTemplateSelection();
@@ -454,7 +454,7 @@ public partial class MainPage : ContentPage
 
             if (!string.Equals(Path.GetExtension(result.FileName), ".xls", StringComparison.OrdinalIgnoreCase))
             {
-                StatusLabel.Text = "Only .xls files are allowed. Choose the attendance report exported from your software.";
+                StatusLabel.Text = "Choose an .xls attendance file saved from your attendance software.";
                 return;
             }
 
@@ -466,7 +466,7 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            StatusLabel.Text = $"Could not open the file picker: {ex.Message}";
+            StatusLabel.Text = $"Could not open the file list: {ex.Message}";
         }
     }
 
@@ -482,7 +482,7 @@ public partial class MainPage : ContentPage
         var selectedMonthlyTemplate = _selectedMonthlyTemplate;
         if (selectedCategory == ReportCategory.Monthly && selectedMonthlyTemplate is null)
         {
-            StatusLabel.Text = "Choose one of the monthly templates first.";
+            StatusLabel.Text = "Choose a monthly report first.";
             return;
         }
 
@@ -520,17 +520,17 @@ public partial class MainPage : ContentPage
                 if ((selectedCategory == ReportCategory.Monthly) != isMonthlyReport)
                 {
                     throw new InvalidDataException(selectedCategory == ReportCategory.Monthly
-                        ? "This is a daily report. Choose the Daily template, or upload a monthly report."
-                        : "This is a monthly report. Choose the Monthly template, or upload a one-day report.");
+                        ? "This file has a daily report. Choose Daily, or choose a monthly file."
+                        : "This file has a monthly report. Choose Monthly, or choose a daily file.");
                 }
 
                 var dates = report.Records.Select(r => r.Date).Distinct().OrderBy(d => d).ToList();
                 if (dates.Count == 0)
                 {
-                    throw new InvalidDataException("No attendance rows were found in this file.");
+                    throw new InvalidDataException("This file has no attendance records.");
                 }
                 if (isMonthlyReport && dates.Any(date => date.Year != dates[0].Year || date.Month != dates[0].Month))
-                    throw new InvalidDataException("Monthly templates support one calendar month per report. Export each month separately.");
+                    throw new InvalidDataException("Each monthly report needs one month. Save each month in a separate file.");
                 IReadOnlyList<HolidayEntry> holidays = isMonthlyReport
                     ? _holidayCalendarStore.LoadOrSeed()
                     : Array.Empty<HolidayEntry>();
@@ -546,9 +546,9 @@ public partial class MainPage : ContentPage
                     dates[0]);
 
                 var monthlyNote = selectedCategory == ReportCategory.Monthly
-                    ? "Attendance totals calculated from daily records."
+                    ? "Totals are based on daily records."
                         + (report.Records.All(record => string.IsNullOrWhiteSpace(record.Status))
-                            ? " Daily leave codes are unavailable; absence and weekly off are inferred from punches and the calendar."
+                            ? " The file has no daily leave details. Absent days and weekly days off are worked out from punches and the calendar."
                             : "")
                     : "";
                 var monthlyWarning = "";
@@ -556,7 +556,7 @@ public partial class MainPage : ContentPage
                 {
                     var warnings = new List<string> { HolidayCalendarStore.GetYearWarning(holidays, dates[0].Year) };
                     if (dates.Count < DateTime.DaysInMonth(dates[0].Year, dates[0].Month))
-                        warnings.Add("Attendance totals count only exported dates. Unreported dates are left blank.");
+                        warnings.Add("Totals count only dates in the file. Other dates stay blank.");
                     monthlyWarning = string.Join(" ", warnings.Where(warning => !string.IsNullOrWhiteSpace(warning)));
                 }
 
@@ -569,7 +569,7 @@ public partial class MainPage : ContentPage
             });
 
             // 2. let the user choose where to save it
-            StatusLabel.Text = $"Choose where to save the {(saveAsPdf ? "PDF report" : "Excel workbook")}...";
+            StatusLabel.Text = $"Choose where to save the {(saveAsPdf ? "PDF report" : "Excel file")}...";
             var outputPath = await AskForSaveLocationAsync(Path.ChangeExtension(parsed.fileName, extension), extension);
             if (outputPath is null)
             {
@@ -579,7 +579,7 @@ public partial class MainPage : ContentPage
             _outputDirectory = Path.GetDirectoryName(outputPath) ?? "";
 
             // 3. generate the workbook and write it
-            StatusLabel.Text = "Converting...";
+            StatusLabel.Text = "Creating report...";
             var conversion = await Task.Run(() =>
             {
                 var built = TemplateWriter.BuildRows(parsed.report.Records);
@@ -641,7 +641,7 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            StatusLabel.Text = $"Conversion failed: {ex.Message}";
+            StatusLabel.Text = $"Could not create the report: {ex.Message}";
         }
         finally
         {
@@ -672,7 +672,7 @@ public partial class MainPage : ContentPage
             picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
             picker.DefaultFileExtension = extension;
             picker.FileTypeChoices.Add(
-                extension == ".pdf" ? "PDF report" : "Excel workbook",
+                extension == ".pdf" ? "PDF report" : "Excel file",
                 new List<string> { extension });
 
             var file = await picker.PickSaveFileAsync();
@@ -680,7 +680,7 @@ public partial class MainPage : ContentPage
         }
 #endif
 #if WINDOWS
-        throw new InvalidOperationException("The Save As dialog is unavailable. Please reopen the app and try again.");
+        throw new InvalidOperationException("Could not open Save As. Close and reopen the app, then try again.");
 #else
         return Path.Combine(GetFallbackDirectory(), fileName);
 #endif
@@ -839,8 +839,8 @@ public partial class MainPage : ContentPage
         DashDateControls.IsVisible = _dashboardSelection.SupportsMonthly && daily;
         DashScope.Text = daily
             ? $"Daily dashboard · {d.From:dd MMM yyyy}"
-            : $"Monthly dashboard · {d.From:MMMM yyyy} · {d.Days.Count} exported dates";
-        DashSource.Text = $"Source: {_sourceFileName}";
+            : $"Monthly dashboard · {d.From:MMMM yyyy} · {d.Days.Count} dates in the file";
+        DashSource.Text = $"File: {_sourceFileName}";
         foreach (var button in new[] { DashDailyBtn, DashMonthlyBtn })
         {
             var selected = (button == DashDailyBtn) == daily;
@@ -913,7 +913,7 @@ public partial class MainPage : ContentPage
 
     private void BuildEmployeeTable(Dashboard d)
     {
-        var headers = new[] { "ID", "Name", "Complete pairs", "No punches", "Incomplete", "Avg in", "Avg out", "Avg hrs", "Completeness" };
+        var headers = new[] { "ID", "Name", "Both punches", "No punches", "One missing", "Average in", "Average out", "Average time", "Both punches %" };
         string[] Row(EmployeeSummary e) => new[]
         {
             e.Id, e.Name,
@@ -1005,7 +1005,7 @@ public partial class MainPage : ContentPage
         {
             // QuestPDF's native renderer is unavailable on this platform (e.g. Android);
             // the Windows build - the deployment target - is unaffected.
-            DashStatus.Text = "PDF export is supported in the Windows version of the app.";
+            DashStatus.Text = "You can save PDFs in the Windows app.";
         }
         catch (Exception ex)
         {

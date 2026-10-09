@@ -55,7 +55,7 @@ public partial class HolidayEditorDialog : ContentView
         }
         if (CategoryPicker.SelectedIndex < 0 || CategoryPicker.SelectedIndex >= _categories.Count)
         {
-            ShowValidation("Choose a holiday category.");
+            ShowValidation("Choose a holiday type.");
             return;
         }
 
