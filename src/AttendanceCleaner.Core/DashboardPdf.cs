@@ -78,7 +78,8 @@ public static class DashboardPdf
                                         barCol.Item().AlignCenter().Width(14).Height((float)(90.0 * day.Absent / max))
                                             .Background("#94A3B8").PaddingHorizontal(1);
                                         barCol.Item().PaddingTop(2).AlignCenter()
-                                            .Text(day.Date.ToString("dd MMM", CultureInfo.InvariantCulture))
+                                            .Text(day.Date.ToString("dd", CultureInfo.InvariantCulture)
+                                                + "\n" + day.Date.ToString("MMM", CultureInfo.InvariantCulture))
                                             .FontSize(8).FontColor("#6B7280");
                                     });
                                 }
