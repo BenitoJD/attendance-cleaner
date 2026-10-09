@@ -715,8 +715,11 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OnConvertAnotherClicked(object? sender, EventArgs e)
+    private async void OnConvertAnotherClicked(object? sender, EventArgs e)
     {
+        // Reset the existing native scroll view before hiding it or replacing its content.
+        if (DashboardSection.Handler is not null)
+            await DashboardSection.ScrollToAsync(0, 0, false);
         ResultsSection.IsVisible = false;
         ConvertSection.IsVisible = true;
         FileNameLabel.Text = "";
